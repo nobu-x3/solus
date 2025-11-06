@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # Fetch Google Test
 include(FetchContent)
@@ -43,4 +43,9 @@ add_solus_test(test_config
 add_solus_test(test_memory_database
     unit/test_memory_database.cpp
     ${CMAKE_SOURCE_DIR}/src/memory/database.cpp
+)
+add_solus_test(test_prompt_builder
+    unit/test_prompt_builder.cpp
+    ${CMAKE_SOURCE_DIR}/src/memory/database.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/prompt_builder.cpp
 )
