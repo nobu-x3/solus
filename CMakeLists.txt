@@ -7,7 +7,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pthread")
 
+option(GGML_HIPBLAS "Enable hipBLAS support for AMD GPUs" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+
+# ROCm/HIP support for AMD GPU
+if(GGML_HIPBLAS)
+    list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
+    find_package(hip REQUIRED)
+    find_package(hipblas REQUIRED)
+    find_package(rocblas REQUIRED)
+
+    add_compile_definitions(GGML_USE_HIPBLAS)
+    message(STATUS "ROCm found: ${hip_VERSION}")
+    message(STATUS "hipBLAS enabled")
+endif()
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -22,6 +35,7 @@ set(SOLUS_SOURCES
     src/memory/database.cpp
     src/server/prompt_builder.cpp
     src/server/response_parser.cpp
+    src/llm/llama_handler.cpp
 )
 
 add_executable(solus_server ${SOLUS_SOURCES})
@@ -32,8 +46,9 @@ add_subdirectory(vendor/hnswlib)
 set(JSON_BuildTests Off)
 add_subdirectory(vendor/json)
 
-set(LLAMA_CURL Off)
-set(LLAMA_ALL_WARNINGS Off)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 add_subdirectory(vendor/llama.cpp)
 
 set(SAP_HTTP_BUILD_TESTS Off)
@@ -56,6 +71,14 @@ target_link_libraries(solus_server
     llama
     nlohmann_json::nlohmann_json
 )
+
+if(GGML_HIPBLAS)
+    target_link_libraries(solus_server
+        hip::host
+        roc::hipblas
+        roc::rocblas
+    )
+endif()
 
 option(BUILD_TESTS "Build tests" OFF)
 
