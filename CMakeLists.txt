@@ -20,6 +20,7 @@ include_directories(
 set(SOLUS_SOURCES
     src/main.cpp
     src/memory/database.cpp
+    src/server/prompt_builder.cpp
 )
 
 add_executable(solus_server ${SOLUS_SOURCES})
@@ -56,6 +57,7 @@ target_link_libraries(solus_server
 )
 
 option(BUILD_TESTS "Build tests" OFF)
+
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
