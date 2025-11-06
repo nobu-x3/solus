@@ -19,6 +19,7 @@ include_directories(
 
 set(SOLUS_SOURCES
     src/main.cpp
+    src/memory/database.cpp
 )
 
 add_executable(solus_server ${SOLUS_SOURCES})
