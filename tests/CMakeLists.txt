@@ -19,6 +19,7 @@ function(add_solus_test TEST_NAME)
     add_executable(${TEST_NAME} ${ARGN})
     
     target_include_directories(${TEST_NAME} PRIVATE
+        ${PROJECT_SOURCE_DIR}/tests/include
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/vendor/json/include
         ${PROJECT_SOURCE_DIR}/vendor/hnswlib
@@ -32,7 +33,6 @@ function(add_solus_test TEST_NAME)
     
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     
-    # Set timeout for tests
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 60)
 endfunction()
 
