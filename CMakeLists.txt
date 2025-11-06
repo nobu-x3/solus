@@ -54,6 +54,12 @@ target_link_libraries(solus_server
     nlohmann_json::nlohmann_json
 )
 
+option(BUILD_TESTS "Build tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
 message(STATUS "")
 message(STATUS "========================================")
 message(STATUS "Solus Server Configuration")

@@ -1,4 +1,4 @@
 #!/bin/bash
 cd "$(dirname "$0")/.."
 mkdir -p build
-(cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug && cmake --build . --config Release -j $(nproc))
+(cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug && cmake --build . --config Debug -j $(nproc))
