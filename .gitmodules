@@ -1,3 +1,12 @@
 [submodule "vendor/sap_http"]
 	path = vendor/sap_http
 	url = https://github.com/nobu-x3/sap_http.git
+[submodule "vendor/llama.cpp"]
+	path = vendor/llama.cpp
+	url = https://github.com/ggerganov/llama.cpp.git
+[submodule "vendor/hnswlib"]
+	path = vendor/hnswlib
+	url = https://github.com/nmslib/hnswlib.git
+[submodule "vendor/json"]
+	path = vendor/json
+	url = https://github.com/nlohmann/json.git
