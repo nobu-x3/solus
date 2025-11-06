@@ -49,3 +49,7 @@ add_solus_test(test_prompt_builder
     ${CMAKE_SOURCE_DIR}/src/memory/database.cpp
     ${CMAKE_SOURCE_DIR}/src/server/prompt_builder.cpp
 )
+add_solus_test(test_response_parser
+    unit/test_response_parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/response_parser.cpp
+)
