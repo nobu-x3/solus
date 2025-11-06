@@ -21,6 +21,7 @@ set(SOLUS_SOURCES
     src/main.cpp
     src/memory/database.cpp
     src/server/prompt_builder.cpp
+    src/server/response_parser.cpp
 )
 
 add_executable(solus_server ${SOLUS_SOURCES})
