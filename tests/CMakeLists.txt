@@ -29,6 +29,10 @@ function(add_solus_test TEST_NAME)
         gtest
         gtest_main
         gmock
+        sap::http
+        hnswlib::hnswlib
+        llama
+        nlohmann_json::nlohmann_json
     )
 
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
@@ -52,4 +56,13 @@ add_solus_test(test_prompt_builder
 add_solus_test(test_response_parser
     unit/test_response_parser.cpp
     ${CMAKE_SOURCE_DIR}/src/server/response_parser.cpp
+)
+
+add_solus_test(test_integration_server
+    integration/test_server.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/solus_server.cpp
+    ${CMAKE_SOURCE_DIR}/src/memory/database.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/response_parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/prompt_builder.cpp
+    ${CMAKE_SOURCE_DIR}/src/llm/llama_handler.cpp
 )
