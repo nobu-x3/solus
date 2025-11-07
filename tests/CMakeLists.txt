@@ -66,3 +66,11 @@ add_solus_test(test_integration_server
     ${CMAKE_SOURCE_DIR}/src/server/prompt_builder.cpp
     ${CMAKE_SOURCE_DIR}/src/llm/llama_handler.cpp
 )
+add_solus_test(test_integration_memory
+    integration/test_memory.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/solus_server.cpp
+    ${CMAKE_SOURCE_DIR}/src/memory/database.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/response_parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/prompt_builder.cpp
+    ${CMAKE_SOURCE_DIR}/src/llm/llama_handler.cpp
+)
