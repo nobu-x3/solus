@@ -19,3 +19,9 @@ _deps/
 .idea/
 *.log
 .cache
+
+models/
+.venv
+__pycache__/
+*.pyc
+.env
