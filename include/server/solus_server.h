@@ -25,7 +25,7 @@ public:
   void stop();
 
 private:
-  void setupRoutes();
+  void setup_routes();
 
   http::Response handle_health(const http::Request &req);
   http::Response handle_chat(const http::Request &req);

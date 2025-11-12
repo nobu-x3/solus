@@ -34,12 +34,12 @@ bool SolusServer::initialize() {
   }
   m_PromptBuilder = std::make_unique<PromptBuilder>();
   m_HttpServer = std::make_unique<http::Server>();
-  setupRoutes();
+  setup_routes();
   std::cout << "Server initialization complete!" << std::endl;
   return true;
 }
 
-void SolusServer::setupRoutes() {
+void SolusServer::setup_routes() {
   m_HttpServer->route(
       "/health", http::EMethod::GET,
       [this](const http::Request &req) { return this->handle_health(req); });
