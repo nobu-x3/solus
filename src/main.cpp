@@ -2,6 +2,7 @@
 #include <csignal>
 #include <iostream>
 #include <net/http.h>
+#include "server/solus_server.h"
 
 void signal_handler(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
@@ -67,8 +68,12 @@ int main(int argc, char **argv) {
             << "========================================\n"
             << std::endl;
   try {
-    http::ServerConfig cfg{};
-    http::Server srv{std::move(cfg)};
+    solus::SolusServer server(std::move(config));
+    if (!server.initialize()) {
+      std::cerr << "Failed to initialize server" << std::endl;
+      return 1;
+    }
+    server.run();
   } catch (const std::exception &e) {
     std::cerr << "Fatal error: " << e.what() << std::endl;
     return 1;

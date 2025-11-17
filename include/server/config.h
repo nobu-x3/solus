@@ -29,7 +29,7 @@ struct ServerConfig {
   // Memory database settings
   std::string memory_db_path = "./memory_db";
   int embedding_dim = 4096; // Qwen2.5 embedding size
-  int max_memories = 1000000;
+  int max_memories = 1000;
 
   // Logging
   bool verbose = true;
