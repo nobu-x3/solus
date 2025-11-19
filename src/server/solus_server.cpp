@@ -34,6 +34,7 @@ bool SolusServer::initialize() {
   }
   m_PromptBuilder = std::make_unique<PromptBuilder>();
   m_HttpServer = std::make_unique<http::Server>();
+  m_HttpServer->start();
   setup_routes();
   std::cout << "Server initialization complete!" << std::endl;
   return true;
