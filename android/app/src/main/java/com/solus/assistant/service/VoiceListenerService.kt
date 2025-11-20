@@ -61,8 +61,9 @@ class VoiceListenerService : Service() {
         fun getService(): VoiceListenerService = this@VoiceListenerService
     }
 
-    fun setCommandRecognizedCallback(callback: (String) -> Unit) {
+    fun setCommandRecognizedCallback(callback: ((String) -> Unit)?) {
         onCommandRecognizedCallback = callback
+        DebugLog.d(TAG, "Callback ${if (callback == null) "cleared" else "set"}")
     }
 
     /**
