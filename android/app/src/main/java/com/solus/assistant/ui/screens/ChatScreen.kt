@@ -57,10 +57,18 @@ fun ChatScreen(
     var isSending by remember { mutableStateOf(false) }
     var listeningStatus by remember { mutableStateOf<String?>(null) }
 
-    // Load conversation ID
+    // Load conversation ID and chat history
     var conversationId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        settingsManager.conversationId.collect { conversationId = it }
+        launch {
+            settingsManager.conversationId.collect { conversationId = it }
+        }
+        launch {
+            settingsManager.chatHistory.collect { history ->
+                android.util.Log.d("ChatScreen", "Loaded ${history.size} messages from history")
+                messages = history
+            }
+        }
     }
 
     // Service connection
@@ -108,13 +116,16 @@ fun ChatScreen(
         }
 
         // Add user message
-        messages = messages + ChatMessage(text, isUser = true, isVoiceInput = isVoice)
+        val userMessage = ChatMessage(text, isUser = true, isVoiceInput = isVoice)
+        messages = messages + userMessage
         android.util.Log.d("ChatScreen", "sendMessage: Added user message, messages.size=${messages.size}")
         textInput = ""
         isSending = true
 
         scope.launch {
             try {
+                // Save user message to history
+                settingsManager.addMessageToHistory(userMessage)
                 val baseUrl = settingsManager.serverBaseUrl.first()
                 val userId = settingsManager.userId.first()
                 val api = RetrofitClient.getInstance(baseUrl)
@@ -135,11 +146,13 @@ fun ChatScreen(
                         settingsManager.setConversationId(conversationId)
 
                         // Add assistant message
-                        messages = messages + ChatMessage(
+                        val assistantMessage = ChatMessage(
                             chatResponse.response,
                             isUser = false,
                             isVoiceInput = isVoice
                         )
+                        messages = messages + assistantMessage
+                        settingsManager.addMessageToHistory(assistantMessage)
 
                         // Execute action if present
                         chatResponse.action?.let { action ->
@@ -147,18 +160,22 @@ fun ChatScreen(
                         }
                     }
                 } else {
-                    messages = messages + ChatMessage(
+                    val errorMessage = ChatMessage(
                         "Error: ${response.code()} ${response.message()}",
                         isUser = false,
                         isVoiceInput = false
                     )
+                    messages = messages + errorMessage
+                    settingsManager.addMessageToHistory(errorMessage)
                 }
             } catch (e: Exception) {
-                messages = messages + ChatMessage(
+                val errorMessage = ChatMessage(
                     "Error: ${e.message}",
                     isUser = false,
                     isVoiceInput = false
                 )
+                messages = messages + errorMessage
+                settingsManager.addMessageToHistory(errorMessage)
             } finally {
                 isSending = false
             }

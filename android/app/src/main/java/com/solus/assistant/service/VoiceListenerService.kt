@@ -19,6 +19,7 @@ import com.solus.assistant.MainActivity
 import com.solus.assistant.util.BeepGenerator
 import com.solus.assistant.util.DebugLog
 import com.solus.assistant.util.VoskModelDownloader
+import com.solus.assistant.data.model.ChatMessage
 import com.solus.assistant.data.model.ChatRequest
 import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
@@ -536,6 +537,12 @@ class VoiceListenerService : Service() {
                         DebugLog.d(TAG, "Response: ${chatResponse.response}")
                         conversationId = chatResponse.conversationId
                         settingsManager.setConversationId(conversationId)
+
+                        // Save messages to history
+                        val userMessage = ChatMessage(text, isUser = true, isVoiceInput = true)
+                        val assistantMessage = ChatMessage(chatResponse.response, isUser = false, isVoiceInput = true)
+                        settingsManager.addMessageToHistory(userMessage)
+                        settingsManager.addMessageToHistory(assistantMessage)
 
                         // Execute action if present
                         chatResponse.action?.let { action ->

@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.solus.assistant.data.model.ChatMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -31,6 +34,7 @@ class SettingsManager(val context: Context) {
         private val WAKE_WORD = stringPreferencesKey("wake_word")
         private val VOSK_MODEL_ID = stringPreferencesKey("vosk_model_id")
         private val FIRST_RUN_COMPLETE = booleanPreferencesKey("first_run_complete")
+        private val CHAT_HISTORY = stringPreferencesKey("chat_history")
 
         // Default values
         const val DEFAULT_SERVER_HOST = "http://10.0.2.2" // Emulator localhost
@@ -38,6 +42,8 @@ class SettingsManager(val context: Context) {
         const val DEFAULT_WAKE_WORD = "hey solus"
         const val DEFAULT_MODEL_ID = "vosk-model-small-en-us-0.15"
     }
+
+    private val gson = Gson()
 
     /**
      * Get server base URL
@@ -206,6 +212,7 @@ class SettingsManager(val context: Context) {
      */
     suspend fun resetConversation() {
         setConversationId(null)
+        clearChatHistory()
     }
 
     /**
@@ -222,5 +229,55 @@ class SettingsManager(val context: Context) {
             "wakeWordEnabled" to wakeWordEnabled,
             "wakeWord" to wakeWord
         )
+    }
+
+    /**
+     * Get chat history
+     */
+    val chatHistory: Flow<List<ChatMessage>> = context.dataStore.data.map { preferences ->
+        val json = preferences[CHAT_HISTORY] ?: "[]"
+        try {
+            val type = object : TypeToken<List<ChatMessage>>() {}.type
+            gson.fromJson<List<ChatMessage>>(json, type) ?: emptyList()
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsManager", "Error parsing chat history", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Save chat history
+     */
+    suspend fun saveChatHistory(messages: List<ChatMessage>) {
+        context.dataStore.edit { preferences ->
+            val json = gson.toJson(messages)
+            preferences[CHAT_HISTORY] = json
+        }
+    }
+
+    /**
+     * Add message to chat history
+     */
+    suspend fun addMessageToHistory(message: ChatMessage) {
+        context.dataStore.edit { preferences ->
+            val json = preferences[CHAT_HISTORY] ?: "[]"
+            val messages = try {
+                val type = object : TypeToken<List<ChatMessage>>() {}.type
+                gson.fromJson<List<ChatMessage>>(json, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+            val updatedMessages = messages + message
+            preferences[CHAT_HISTORY] = gson.toJson(updatedMessages)
+        }
+    }
+
+    /**
+     * Clear chat history
+     */
+    suspend fun clearChatHistory() {
+        context.dataStore.edit { preferences ->
+            preferences[CHAT_HISTORY] = "[]"
+        }
     }
 }
