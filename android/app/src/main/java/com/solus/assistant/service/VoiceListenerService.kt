@@ -23,6 +23,7 @@ import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener as VoskRecognitionListener
@@ -222,22 +223,31 @@ class VoiceListenerService : Service() {
                 val listener = object : VoskRecognitionListener {
                     override fun onPartialResult(hypothesis: String?) {
                         hypothesis?.let {
-                            DebugLog.d(TAG, "Partial: $it")
-                            checkForWakeWord(it)
+                            val text = parseVoskJson(it)
+                            if (text != null) {
+                                DebugLog.d(TAG, "Partial: '$text'")
+                                checkForWakeWord(it)
+                            }
                         }
                     }
 
                     override fun onResult(hypothesis: String?) {
                         hypothesis?.let {
-                            DebugLog.d(TAG, "Result: $it")
-                            checkForWakeWord(it)
+                            val text = parseVoskJson(it)
+                            if (text != null) {
+                                DebugLog.d(TAG, "Result: '$text'")
+                                checkForWakeWord(it)
+                            }
                         }
                     }
 
                     override fun onFinalResult(hypothesis: String?) {
                         hypothesis?.let {
-                            DebugLog.d(TAG, "Final: $it")
-                            checkForWakeWord(it)
+                            val text = parseVoskJson(it)
+                            if (text != null) {
+                                DebugLog.d(TAG, "Final: '$text'")
+                                checkForWakeWord(it)
+                            }
                         }
                     }
 
@@ -246,7 +256,7 @@ class VoiceListenerService : Service() {
                     }
 
                     override fun onTimeout() {
-                        DebugLog.d(TAG, "Vosk timeout - continuing")
+                        // Don't log timeout - too spammy
                     }
                 }
 
@@ -258,13 +268,34 @@ class VoiceListenerService : Service() {
     }
 
     /**
+     * Parse Vosk JSON result to extract text
+     * Returns null if no text or empty text
+     */
+    private fun parseVoskJson(jsonString: String): String? {
+        return try {
+            val json = JSONObject(jsonString)
+            // Try "text" field first (final/result), then "partial" field
+            val text = json.optString("text", null) ?: json.optString("partial", null)
+            if (text.isNullOrBlank()) null else text
+        } catch (e: Exception) {
+            DebugLog.e(TAG, "Failed to parse Vosk JSON: ${e.message}")
+            null
+        }
+    }
+
+    /**
      * Check if wake word was detected in Vosk results
      */
     private fun checkForWakeWord(hypothesis: String) {
         if (isProcessingCommand) return
 
-        val lowerHypothesis = hypothesis.lowercase()
-        if (lowerHypothesis.contains(wakeWord)) {
+        // Parse JSON to extract actual text
+        val text = parseVoskJson(hypothesis) ?: return
+
+        val lowerText = text.lowercase()
+        DebugLog.d(TAG, "Checking text: '$text' for wake word: '$wakeWord'")
+
+        if (lowerText.contains(wakeWord.lowercase())) {
             DebugLog.d(TAG, "✓ Wake word detected!")
             onWakeWordDetected()
         }
@@ -396,15 +427,33 @@ class VoiceListenerService : Service() {
             // Restart Vosk listening
             voskService?.startListening(object : VoskRecognitionListener {
                 override fun onPartialResult(hypothesis: String?) {
-                    hypothesis?.let { checkForWakeWord(it) }
+                    hypothesis?.let {
+                        val text = parseVoskJson(it)
+                        if (text != null) {
+                            DebugLog.d(TAG, "Partial: '$text'")
+                            checkForWakeWord(it)
+                        }
+                    }
                 }
 
                 override fun onResult(hypothesis: String?) {
-                    hypothesis?.let { checkForWakeWord(it) }
+                    hypothesis?.let {
+                        val text = parseVoskJson(it)
+                        if (text != null) {
+                            DebugLog.d(TAG, "Result: '$text'")
+                            checkForWakeWord(it)
+                        }
+                    }
                 }
 
                 override fun onFinalResult(hypothesis: String?) {
-                    hypothesis?.let { checkForWakeWord(it) }
+                    hypothesis?.let {
+                        val text = parseVoskJson(it)
+                        if (text != null) {
+                            DebugLog.d(TAG, "Final: '$text'")
+                            checkForWakeWord(it)
+                        }
+                    }
                 }
 
                 override fun onError(exception: Exception?) {
@@ -412,7 +461,7 @@ class VoiceListenerService : Service() {
                 }
 
                 override fun onTimeout() {
-                    DebugLog.d(TAG, "Vosk timeout - continuing")
+                    // Don't log timeout - too spammy
                 }
             })
         }
