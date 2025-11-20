@@ -5,7 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Binder
 import android.os.Build
 import android.os.Bundle
@@ -32,6 +34,7 @@ class VoiceListenerService : Service() {
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var settingsManager: SettingsManager
     private lateinit var actionExecutor: ActionExecutor
+    private lateinit var audioManager: AudioManager
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var isListening = false
@@ -50,6 +53,7 @@ class VoiceListenerService : Service() {
 
         settingsManager = SettingsManager(this)
         actionExecutor = ActionExecutor(this)
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification("Ready to listen"))
@@ -276,6 +280,13 @@ class VoiceListenerService : Service() {
             return
         }
 
+        // Mute the beep sound by adjusting stream volume
+        audioManager.adjustStreamVolume(
+            AudioManager.STREAM_NOTIFICATION,
+            AudioManager.ADJUST_MUTE,
+            0
+        )
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
@@ -293,6 +304,16 @@ class VoiceListenerService : Service() {
         } catch (e: Exception) {
             DebugLog.e(TAG, "❌ Exception starting recognition: ${e.message}", e)
             updateNotification("Error: ${e.message}")
+        }
+
+        // Unmute after a short delay
+        serviceScope.launch {
+            delay(300)
+            audioManager.adjustStreamVolume(
+                AudioManager.STREAM_NOTIFICATION,
+                AudioManager.ADJUST_UNMUTE,
+                0
+            )
         }
     }
 
