@@ -516,6 +516,10 @@ class VoiceListenerService : Service() {
     private fun sendToServer(text: String) {
         serviceScope.launch {
             try {
+                // Save user message immediately
+                val userMessage = ChatMessage(text, isUser = true, isVoiceInput = true)
+                settingsManager.addMessageToHistory(userMessage)
+
                 val baseUrl = settingsManager.serverBaseUrl.first()
                 val userId = settingsManager.userId.first()
                 val api = RetrofitClient.getInstance(baseUrl)
@@ -538,10 +542,8 @@ class VoiceListenerService : Service() {
                         conversationId = chatResponse.conversationId
                         settingsManager.setConversationId(conversationId)
 
-                        // Save messages to history
-                        val userMessage = ChatMessage(text, isUser = true, isVoiceInput = true)
+                        // Save assistant message to history
                         val assistantMessage = ChatMessage(chatResponse.response, isUser = false, isVoiceInput = true)
-                        settingsManager.addMessageToHistory(userMessage)
                         settingsManager.addMessageToHistory(assistantMessage)
 
                         // Execute action if present
