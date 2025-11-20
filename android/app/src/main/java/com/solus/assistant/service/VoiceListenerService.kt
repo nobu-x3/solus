@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
 import android.os.Binder
 import android.os.Build
 import android.os.Bundle
@@ -23,25 +22,32 @@ import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener as VoskRecognitionListener
+import org.vosk.android.SpeechService
+import java.io.File
 import java.util.*
 
 /**
- * Foreground service that continuously listens for voice commands
+ * Foreground service with FREE local wake word detection using Vosk
+ * - Completely free, no API keys
+ * - Runs entirely on-device
+ * - No beeping!
  */
 class VoiceListenerService : Service() {
 
     private val binder = LocalBinder()
+    private var voskService: SpeechService? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var settingsManager: SettingsManager
     private lateinit var actionExecutor: ActionExecutor
-    private lateinit var audioManager: AudioManager
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var isListening = false
     private var conversationId: String? = null
-    private var wakeWordEnabled = true
+    private var isProcessingCommand = false
     private var wakeWord = "hey solus"
-    private var waitingForCommand = false
 
     inner class LocalBinder : Binder() {
         fun getService(): VoiceListenerService = this@VoiceListenerService
@@ -53,22 +59,13 @@ class VoiceListenerService : Service() {
 
         settingsManager = SettingsManager(this)
         actionExecutor = ActionExecutor(this)
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification("Ready to listen"))
 
         // Load settings
         serviceScope.launch {
-            launch {
-                settingsManager.conversationId.collect { conversationId = it }
-            }
-            launch {
-                settingsManager.wakeWordEnabled.collect { wakeWordEnabled = it }
-            }
-            launch {
-                settingsManager.wakeWord.collect { wakeWord = it.lowercase() }
-            }
+            settingsManager.conversationId.collect { conversationId = it }
         }
     }
 
@@ -96,7 +93,7 @@ class VoiceListenerService : Service() {
     }
 
     /**
-     * Start listening for voice commands
+     * Start listening for wake word using Vosk
      */
     fun startListening() {
         if (isListening) {
@@ -104,15 +101,25 @@ class VoiceListenerService : Service() {
             return
         }
 
-        DebugLog.d(TAG, "Starting to listen")
+        DebugLog.d(TAG, "Starting Vosk wake word detection")
         isListening = true
-        waitingForCommand = false
-        updateNotification("Listening...")
-        initializeSpeechRecognizer()
+        updateNotification("Initializing wake word...")
+
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                initializeVosk()
+            } catch (e: Exception) {
+                DebugLog.e(TAG, "Failed to initialize Vosk: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    updateNotification("Error: ${e.message}")
+                    stopListening()
+                }
+            }
+        }
     }
 
     /**
-     * Stop listening for voice commands
+     * Stop listening
      */
     fun stopListening() {
         if (!isListening) {
@@ -122,14 +129,16 @@ class VoiceListenerService : Service() {
 
         DebugLog.d(TAG, "Stopping listening")
         isListening = false
-        waitingForCommand = false
+        voskService?.stop()
+        voskService?.shutdown()
+        voskService = null
         speechRecognizer?.destroy()
         speechRecognizer = null
         updateNotification("Stopped")
     }
 
     /**
-     * Reset conversation (start new conversation)
+     * Reset conversation
      */
     private fun resetConversation() {
         serviceScope.launch {
@@ -140,224 +149,241 @@ class VoiceListenerService : Service() {
     }
 
     /**
-     * Initialize speech recognizer
+     * Initialize Vosk wake word detection
      */
-    private fun initializeSpeechRecognizer() {
-        DebugLog.d(TAG, "Initializing speech recognizer")
+    private suspend fun initializeVosk() {
+        withContext(Dispatchers.IO) {
+            DebugLog.d(TAG, "Initializing Vosk...")
 
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            DebugLog.e(TAG, "❌ Speech recognition NOT AVAILABLE on this device!")
-            DebugLog.e(TAG, "This usually means:")
-            DebugLog.e(TAG, "  1. You're on an emulator without Google Play Services")
-            DebugLog.e(TAG, "  2. Google app / speech services not installed")
-            DebugLog.e(TAG, "  3. No internet connection (required for speech recognition)")
-            updateNotification("❌ Speech recognition unavailable")
-            stopListening()
+            // Check if model exists, if not download it
+            val modelPath = File(filesDir, "vosk-model-small-en-us-0.15")
+
+            if (!modelPath.exists()) {
+                withContext(Dispatchers.Main) {
+                    updateNotification("Downloading wake word model...")
+                }
+                DebugLog.d(TAG, "Model not found, need to download")
+
+                // Model needs to be downloaded - see instructions below
+                withContext(Dispatchers.Main) {
+                    DebugLog.e(TAG, "⚠️ Vosk model not found!")
+                    DebugLog.e(TAG, "Download model from: https://alphacephei.com/vosk/models")
+                    DebugLog.e(TAG, "Get 'vosk-model-small-en-us-0.15.zip' (40MB)")
+                    DebugLog.e(TAG, "Extract and place in: ${filesDir.absolutePath}/")
+                    updateNotification("❌ Wake word model required - see logs")
+                    stopListening()
+                }
+                return@withContext
+            }
+
+            DebugLog.d(TAG, "Loading Vosk model from: ${modelPath.absolutePath}")
+            val model = Model(modelPath.absolutePath)
+
+            withContext(Dispatchers.Main) {
+                DebugLog.d(TAG, "✓ Vosk model loaded")
+                updateNotification("Say '$wakeWord'")
+
+                val listener = object : VoskRecognitionListener {
+                    override fun onPartialResult(hypothesis: String?) {
+                        hypothesis?.let {
+                            DebugLog.d(TAG, "Partial: $it")
+                            checkForWakeWord(it)
+                        }
+                    }
+
+                    override fun onResult(hypothesis: String?) {
+                        hypothesis?.let {
+                            DebugLog.d(TAG, "Result: $it")
+                            checkForWakeWord(it)
+                        }
+                    }
+
+                    override fun onFinalResult(hypothesis: String?) {
+                        hypothesis?.let {
+                            DebugLog.d(TAG, "Final: $it")
+                            checkForWakeWord(it)
+                        }
+                    }
+
+                    override fun onError(exception: Exception?) {
+                        DebugLog.e(TAG, "Vosk error: ${exception?.message}", exception)
+                    }
+
+                    override fun onTimeout() {
+                        DebugLog.d(TAG, "Vosk timeout - continuing")
+                    }
+                }
+
+                voskService = SpeechService(Recognizer(model, 16000.0f), 16000.0f)
+                voskService?.startListening(listener)
+                DebugLog.d(TAG, "✓ Vosk wake word detection started")
+            }
+        }
+    }
+
+    /**
+     * Check if wake word was detected in Vosk results
+     */
+    private fun checkForWakeWord(hypothesis: String) {
+        if (isProcessingCommand) return
+
+        val lowerHypothesis = hypothesis.lowercase()
+        if (lowerHypothesis.contains(wakeWord)) {
+            DebugLog.d(TAG, "✓ Wake word detected!")
+            onWakeWordDetected()
+        }
+    }
+
+    /**
+     * Called when wake word is detected - activate command recognition
+     */
+    private fun onWakeWordDetected() {
+        if (isProcessingCommand) {
+            DebugLog.d(TAG, "Already processing command")
             return
         }
 
-        DebugLog.d(TAG, "✓ Speech recognition is available")
+        isProcessingCommand = true
+        updateNotification("Wake word detected!")
+
+        // Stop Vosk temporarily
+        voskService?.stop()
+
+        // Activate Google SpeechRecognizer for command
+        initializeSpeechRecognizer()
+    }
+
+    /**
+     * Initialize Google SpeechRecognizer for command (after wake word)
+     */
+    private fun initializeSpeechRecognizer() {
+        DebugLog.d(TAG, "Starting command recognition...")
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            DebugLog.e(TAG, "❌ Speech recognition not available")
+            updateNotification("❌ Speech recognition unavailable")
+            returnToWakeWordListening()
+            return
+        }
 
         speechRecognizer?.destroy()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
 
         if (speechRecognizer == null) {
-            DebugLog.e(TAG, "❌ Failed to create SpeechRecognizer instance!")
-            updateNotification("Failed to create recognizer")
-            stopListening()
+            DebugLog.e(TAG, "❌ Failed to create SpeechRecognizer")
+            returnToWakeWordListening()
             return
         }
 
-        DebugLog.d(TAG, "✓ SpeechRecognizer created successfully")
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                DebugLog.d(TAG, "Ready for command")
+                updateNotification("Listening for command...")
+            }
 
-        speechRecognizer?.apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    DebugLog.d(TAG, "Ready for speech")
-                    val status = if (wakeWordEnabled && !waitingForCommand) {
-                        "Say \"$wakeWord\""
-                    } else {
-                        "Listening..."
+            override fun onBeginningOfSpeech() {
+                DebugLog.d(TAG, "Command speech started")
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {
+                DebugLog.d(TAG, "Command speech ended")
+            }
+
+            override fun onError(error: Int) {
+                when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH,
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
+                        DebugLog.d(TAG, "No command detected")
                     }
-                    updateNotification(status)
-                }
-
-                override fun onBeginningOfSpeech() {
-                    DebugLog.d(TAG, "Speech started")
-                }
-
-                override fun onRmsChanged(rmsdB: Float) {
-                    // Volume level changed
-                }
-
-                override fun onBufferReceived(buffer: ByteArray?) {
-                    // Partial results
-                }
-
-                override fun onEndOfSpeech() {
-                    DebugLog.d(TAG, "Speech ended")
-                }
-
-                override fun onError(error: Int) {
-                    val errorMessage = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error - Check microphone"
-                        SpeechRecognizer.ERROR_CLIENT -> "Client error"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "MICROPHONE PERMISSION DENIED"
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error - Internet required for speech recognition"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout - Check internet connection"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected" // Normal, not an error
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
-                        SpeechRecognizer.ERROR_SERVER -> "Google speech server error"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected (timeout)"
-                        else -> "Unknown error code: $error"
-                    }
-
-                    // Only log actual errors (not "no match" which is normal)
-                    if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                        DebugLog.e(TAG, "❌ Speech recognition error [$error]: $errorMessage")
-                    } else {
-                        DebugLog.d(TAG, "No speech detected, continuing to listen...")
-                    }
-
-                    // Show important errors in notification
-                    if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
-                        updateNotification("❌ Microphone permission required")
-                    } else if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
-                        updateNotification("⚠️ No internet connection")
-                    }
-
-                    // Restart listening after a short delay (except for permission errors)
-                    if (isListening && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
-                        serviceScope.launch {
-                            delay(1000)
-                            if (isListening) {
-                                startRecognition()
-                            }
-                        }
+                    else -> {
+                        DebugLog.e(TAG, "Command recognition error: $error")
                     }
                 }
+                returnToWakeWordListening()
+            }
 
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    if (!matches.isNullOrEmpty()) {
-                        val text = matches[0]
-                        DebugLog.d(TAG, "Recognized: $text")
-                        handleRecognizedText(text)
-                    }
-
-                    // Continue listening
-                    if (isListening) {
-                        serviceScope.launch {
-                            delay(500)
-                            if (isListening) {
-                                startRecognition()
-                            }
-                        }
-                    }
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val command = matches[0]
+                    DebugLog.d(TAG, "Command recognized: $command")
+                    updateNotification("Processing: $command")
+                    sendToServer(command)
+                } else {
+                    returnToWakeWordListening()
                 }
+            }
 
-                override fun onPartialResults(partialResults: Bundle?) {
-                    // Handle partial results if needed
-                }
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
 
-                override fun onEvent(eventType: Int, params: Bundle?) {
-                    // Handle events if needed
-                }
-            })
-
-            startRecognition()
-        }
+        startCommandRecognition()
     }
 
     /**
-     * Start speech recognition
+     * Start command recognition
      */
-    private fun startRecognition() {
-        DebugLog.d(TAG, "Starting speech recognition...")
-
-        if (speechRecognizer == null) {
-            DebugLog.e(TAG, "❌ Cannot start recognition - SpeechRecognizer is null!")
-            return
-        }
-
-        // Mute the beep sound by adjusting stream volume
-        audioManager.adjustStreamVolume(
-            AudioManager.STREAM_NOTIFICATION,
-            AudioManager.ADJUST_MUTE,
-            0
-        )
-
+    private fun startCommandRecognition() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            // Extended silence tolerance to reduce beeping/restarts
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
         }
 
         try {
             speechRecognizer?.startListening(intent)
-            DebugLog.d(TAG, "✓ Speech recognition started successfully")
+            DebugLog.d(TAG, "✓ Command recognition started")
         } catch (e: Exception) {
-            DebugLog.e(TAG, "❌ Exception starting recognition: ${e.message}", e)
-            updateNotification("Error: ${e.message}")
-        }
-
-        // Unmute after a short delay
-        serviceScope.launch {
-            delay(300)
-            audioManager.adjustStreamVolume(
-                AudioManager.STREAM_NOTIFICATION,
-                AudioManager.ADJUST_UNMUTE,
-                0
-            )
+            DebugLog.e(TAG, "❌ Exception starting command recognition: ${e.message}", e)
+            returnToWakeWordListening()
         }
     }
 
     /**
-     * Handle recognized text
+     * Return to wake word listening
      */
-    private fun handleRecognizedText(text: String) {
-        val lowerText = text.lowercase()
+    private fun returnToWakeWordListening() {
+        DebugLog.d(TAG, "Returning to wake word listening")
+        isProcessingCommand = false
+        speechRecognizer?.destroy()
+        speechRecognizer = null
 
-        // Check for wake word if enabled
-        if (wakeWordEnabled && !waitingForCommand) {
-            if (lowerText.contains(wakeWord)) {
-                DebugLog.d(TAG, "Wake word detected")
+        if (isListening) {
+            updateNotification("Say '$wakeWord'")
 
-                // Check if command is in the same phrase (after wake word)
-                val wakeWordIndex = lowerText.indexOf(wakeWord)
-                val commandText = text.substring(wakeWordIndex + wakeWord.length).trim()
-
-                if (commandText.isNotEmpty()) {
-                    // Wake word and command in same phrase, process immediately
-                    DebugLog.d(TAG, "Command detected with wake word: $commandText")
-                    updateNotification("Processing: $commandText")
-                    sendToServer(commandText)
-                } else {
-                    // Only wake word detected, wait for next phrase
-                    waitingForCommand = true
-                    updateNotification("Listening for command...")
+            // Restart Vosk listening
+            voskService?.startListening(object : VoskRecognitionListener {
+                override fun onPartialResult(hypothesis: String?) {
+                    hypothesis?.let { checkForWakeWord(it) }
                 }
-            }
-            return
-        }
 
-        // Reset waiting state
-        if (wakeWordEnabled) {
-            waitingForCommand = false
-        }
+                override fun onResult(hypothesis: String?) {
+                    hypothesis?.let { checkForWakeWord(it) }
+                }
 
-        // Send to server
-        updateNotification("Processing: $text")
-        sendToServer(text)
+                override fun onFinalResult(hypothesis: String?) {
+                    hypothesis?.let { checkForWakeWord(it) }
+                }
+
+                override fun onError(exception: Exception?) {
+                    DebugLog.e(TAG, "Vosk error: ${exception?.message}", exception)
+                }
+
+                override fun onTimeout() {
+                    DebugLog.d(TAG, "Vosk timeout - continuing")
+                }
+            })
+        }
     }
 
     /**
-     * Send text to server
+     * Send command to server
      */
     private fun sendToServer(text: String) {
         serviceScope.launch {
@@ -392,26 +418,23 @@ class VoiceListenerService : Service() {
 
                         updateNotification("✓ ${chatResponse.response.take(50)}")
 
-                        // Reset to ready state after showing response
+                        // Return to wake word listening
                         serviceScope.launch {
                             delay(3000)
                             if (isListening) {
-                                val status = if (wakeWordEnabled) {
-                                    "Say \"$wakeWord\""
-                                } else {
-                                    "Listening..."
-                                }
-                                updateNotification(status)
+                                returnToWakeWordListening()
                             }
                         }
                     }
                 } else {
                     DebugLog.e(TAG, "Server error: ${response.code()} ${response.message()}")
                     updateNotification("Server error: ${response.code()}")
+                    returnToWakeWordListening()
                 }
             } catch (e: Exception) {
                 DebugLog.e(TAG, "Error sending to server", e)
                 updateNotification("Error: ${e.message}")
+                returnToWakeWordListening()
             }
         }
     }
