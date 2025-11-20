@@ -204,6 +204,14 @@ fun ChatScreen(
         }
     }
 
+    // Clear callback when ChatScreen is disposed
+    DisposableEffect(voiceService) {
+        onDispose {
+            android.util.Log.d("ChatScreen", "Disposing - clearing callback")
+            voiceService?.setCommandRecognizedCallback(null)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
