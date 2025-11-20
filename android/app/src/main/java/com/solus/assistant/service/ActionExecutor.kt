@@ -30,14 +30,20 @@ class ActionExecutor(private val context: Context) {
     fun executeAction(action: ServerAction) {
         Log.d(TAG, "Executing action: ${action.type}")
 
+        // Check if action type is null or empty (server returned empty action object)
+        if (action.type.isNullOrEmpty()) {
+            Log.d(TAG, "No action to execute (empty action)")
+            return
+        }
+
         try {
             when (action.type) {
-                ActionType.TODO_ADD -> executeTodoAdd(action.params)
-                ActionType.REMINDER_SET -> executeReminderSet(action.params)
-                ActionType.NOTE_CREATE -> executeNoteCreate(action.params)
-                ActionType.APP_OPEN -> executeAppOpen(action.params)
-                ActionType.CALL_MAKE -> executeCallMake(action.params)
-                ActionType.MESSAGE_SEND -> executeMessageSend(action.params)
+                ActionType.TODO_ADD -> executeTodoAdd(action.params ?: emptyMap())
+                ActionType.REMINDER_SET -> executeReminderSet(action.params ?: emptyMap())
+                ActionType.NOTE_CREATE -> executeNoteCreate(action.params ?: emptyMap())
+                ActionType.APP_OPEN -> executeAppOpen(action.params ?: emptyMap())
+                ActionType.CALL_MAKE -> executeCallMake(action.params ?: emptyMap())
+                ActionType.MESSAGE_SEND -> executeMessageSend(action.params ?: emptyMap())
                 else -> {
                     Log.w(TAG, "Unknown action type: ${action.type}")
                     showToast("Unknown action: ${action.type}")
