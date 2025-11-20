@@ -1,5 +1,5 @@
 #include "llm/llama_handler.h"
-#include <cstring>
+#include "llama.h"
 #include <iostream>
 
 namespace solus {
@@ -38,6 +38,8 @@ bool LlamaHandler::initialize() {
   ctx_params.n_batch = m_Config.n_batch;
   ctx_params.n_threads = m_Config.n_threads;
   ctx_params.n_threads_batch = m_Config.n_threads;
+  ctx_params.embeddings = true;
+  ctx_params.pooling_type = LLAMA_POOLING_TYPE_MEAN;
   m_Ctx = llama_init_from_model(m_Model, ctx_params);
   if (!m_Ctx) {
     std::cerr << "Failed to create llama context" << std::endl;
