@@ -16,6 +16,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
 import com.solus.assistant.MainActivity
+import com.solus.assistant.util.BeepGenerator
 import com.solus.assistant.util.DebugLog
 import com.solus.assistant.util.VoskModelDownloader
 import com.solus.assistant.data.model.ChatRequest
@@ -52,8 +53,14 @@ class VoiceListenerService : Service() {
     private var wakeWord = "hey solus" // Loaded from settings
     private var modelId = SettingsManager.DEFAULT_MODEL_ID // Loaded from settings
 
+    private var onCommandRecognizedCallback: ((String) -> Unit)? = null
+
     inner class LocalBinder : Binder() {
         fun getService(): VoiceListenerService = this@VoiceListenerService
+    }
+
+    fun setCommandRecognizedCallback(callback: (String) -> Unit) {
+        onCommandRecognizedCallback = callback
     }
 
     override fun onCreate() {
@@ -293,9 +300,32 @@ class VoiceListenerService : Service() {
         val lowerText = text.lowercase()
         DebugLog.d(TAG, "Checking text: '$text' for wake word: '$wakeWord'")
 
-        if (lowerText.contains(wakeWord.lowercase())) {
+        val wakeWordLower = wakeWord.lowercase()
+        if (lowerText.contains(wakeWordLower)) {
             DebugLog.d(TAG, "✓ Wake word detected!")
-            onWakeWordDetected()
+
+            // Play beep immediately
+            BeepGenerator.playWakeWordBeep()
+
+            // Extract command text after wake word
+            val wakeWordIndex = lowerText.indexOf(wakeWordLower)
+            val commandText = text.substring(wakeWordIndex + wakeWord.length).trim()
+
+            if (commandText.isNotEmpty()) {
+                // User said "solus what's the weather" - process immediately
+                DebugLog.d(TAG, "Command detected in same utterance: '$commandText'")
+                isProcessingCommand = true
+                voskService?.stop()
+
+                // Play request sent beep
+                BeepGenerator.playRequestSentBeep()
+
+                // Send command to callback
+                onCommandRecognizedCallback?.invoke(commandText)
+            } else {
+                // User said just "solus" - wait for command via Google Speech
+                onWakeWordDetected()
+            }
         }
     }
 
@@ -375,6 +405,13 @@ class VoiceListenerService : Service() {
                 if (!matches.isNullOrEmpty()) {
                     val command = matches[0]
                     DebugLog.d(TAG, "Command recognized: $command")
+
+                    // Play request sent beep
+                    BeepGenerator.playRequestSentBeep()
+
+                    // Send to callback
+                    onCommandRecognizedCallback?.invoke(command)
+
                     updateNotification("Processing: $command")
                     sendToServer(command)
                 } else {

@@ -55,6 +55,7 @@ fun ChatScreen(
     var serviceConnected by remember { mutableStateOf(false) }
     var voiceService: VoiceListenerService? by remember { mutableStateOf(null) }
     var isSending by remember { mutableStateOf(false) }
+    var listeningStatus by remember { mutableStateOf<String?>(null) }
 
     // Load conversation ID
     var conversationId by remember { mutableStateOf<String?>(null) }
@@ -70,6 +71,13 @@ fun ChatScreen(
                 voiceService = binder.getService()
                 serviceConnected = true
                 isListening = voiceService?.isCurrentlyListening() ?: false
+
+                // Set callback for voice commands
+                voiceService?.setCommandRecognizedCallback { command ->
+                    listeningStatus = "Processing..."
+                    sendMessage(command, isVoice = true)
+                    listeningStatus = null
+                }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -99,11 +107,11 @@ fun ChatScreen(
     /**
      * Send message to server
      */
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, isVoice: Boolean = false) {
         if (text.isBlank() || isSending) return
 
         // Add user message
-        messages = messages + ChatMessage(text, isUser = true)
+        messages = messages + ChatMessage(text, isUser = true, isVoiceInput = isVoice)
         textInput = ""
         isSending = true
 
@@ -131,7 +139,8 @@ fun ChatScreen(
                         // Add assistant message
                         messages = messages + ChatMessage(
                             chatResponse.response,
-                            isUser = false
+                            isUser = false,
+                            isVoiceInput = isVoice
                         )
 
                         // Execute action if present
@@ -142,13 +151,15 @@ fun ChatScreen(
                 } else {
                     messages = messages + ChatMessage(
                         "Error: ${response.code()} ${response.message()}",
-                        isUser = false
+                        isUser = false,
+                        isVoiceInput = false
                     )
                 }
             } catch (e: Exception) {
                 messages = messages + ChatMessage(
                     "Error: ${e.message}",
-                    isUser = false
+                    isUser = false,
+                    isVoiceInput = false
                 )
             } finally {
                 isSending = false
@@ -208,6 +219,39 @@ fun ChatScreen(
                     MessageBubble(message)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
+
+                // Show loading indicator when waiting for server
+                if (isSending) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text(
+                                        "Thinking...",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Input area
@@ -215,41 +259,64 @@ fun ChatScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 8.dp
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = textInput,
-                        onValueChange = { textInput = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("Type a message...") },
-                        maxLines = 4,
-                        enabled = !isSending
-                    )
-
-                    IconButton(
-                        onClick = { sendMessage(textInput) },
-                        enabled = textInput.isNotBlank() && !isSending
-                    ) {
-                        if (isSending) {
+                Column {
+                    // Show listening status
+                    if (listeningStatus != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp
                             )
-                        } else {
-                            Icon(
-                                Icons.Default.Send,
-                                "Send",
-                                tint = if (textInput.isNotBlank()) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
+                            Text(
+                                listeningStatus!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
                             )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = textInput,
+                            onValueChange = { textInput = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Type a message...") },
+                            maxLines = 4,
+                            enabled = !isSending
+                        )
+
+                        IconButton(
+                            onClick = { sendMessage(textInput) },
+                            enabled = textInput.isNotBlank() && !isSending
+                        ) {
+                            if (isSending) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Send,
+                                    "Send",
+                                    tint = if (textInput.isNotBlank()) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
                         }
                     }
                 }
