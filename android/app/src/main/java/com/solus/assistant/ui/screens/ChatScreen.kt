@@ -101,10 +101,15 @@ fun ChatScreen(
      * Send message to server
      */
     fun sendMessage(text: String, isVoice: Boolean = false) {
-        if (text.isBlank() || isSending) return
+        android.util.Log.d("ChatScreen", "sendMessage called: text='$text', isVoice=$isVoice, isSending=$isSending")
+        if (text.isBlank() || isSending) {
+            android.util.Log.d("ChatScreen", "sendMessage: Ignoring (blank or already sending)")
+            return
+        }
 
         // Add user message
         messages = messages + ChatMessage(text, isUser = true, isVoiceInput = isVoice)
+        android.util.Log.d("ChatScreen", "sendMessage: Added user message, messages.size=${messages.size}")
         textInput = ""
         isSending = true
 
@@ -162,7 +167,9 @@ fun ChatScreen(
 
     // Set up callback when service is connected
     LaunchedEffect(voiceService) {
+        android.util.Log.d("ChatScreen", "Setting up callback, voiceService=$voiceService")
         voiceService?.setCommandRecognizedCallback { command ->
+            android.util.Log.d("ChatScreen", "Callback received command: '$command'")
             listeningStatus = "Processing..."
             sendMessage(command, isVoice = true)
             listeningStatus = null
