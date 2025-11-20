@@ -322,6 +322,9 @@ class VoiceListenerService : Service() {
 
                 // Send command to callback
                 onCommandRecognizedCallback?.invoke(commandText)
+
+                // Return to wake word listening after callback
+                returnToWakeWordListening()
             } else {
                 // User said just "solus" - wait for command via Google Speech
                 onWakeWordDetected()
@@ -412,8 +415,8 @@ class VoiceListenerService : Service() {
                     // Send to callback
                     onCommandRecognizedCallback?.invoke(command)
 
-                    updateNotification("Processing: $command")
-                    sendToServer(command)
+                    // Return to wake word listening
+                    returnToWakeWordListening()
                 } else {
                     returnToWakeWordListening()
                 }
