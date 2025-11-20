@@ -17,6 +17,7 @@ import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
 import com.solus.assistant.MainActivity
 import com.solus.assistant.util.DebugLog
+import com.solus.assistant.util.VoskModelDownloader
 import com.solus.assistant.data.model.ChatRequest
 import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
@@ -47,7 +48,8 @@ class VoiceListenerService : Service() {
     private var isListening = false
     private var conversationId: String? = null
     private var isProcessingCommand = false
-    private var wakeWord = "hey solus"
+    private var wakeWord = "hey solus" // Loaded from settings
+    private var modelId = SettingsManager.DEFAULT_MODEL_ID // Loaded from settings
 
     inner class LocalBinder : Binder() {
         fun getService(): VoiceListenerService = this@VoiceListenerService
@@ -65,7 +67,15 @@ class VoiceListenerService : Service() {
 
         // Load settings
         serviceScope.launch {
-            settingsManager.conversationId.collect { conversationId = it }
+            launch {
+                settingsManager.conversationId.collect { conversationId = it }
+            }
+            launch {
+                settingsManager.wakeWord.collect { wakeWord = it }
+            }
+            launch {
+                settingsManager.voskModelId.collect { modelId = it }
+            }
         }
     }
 
@@ -153,27 +163,51 @@ class VoiceListenerService : Service() {
      */
     private suspend fun initializeVosk() {
         withContext(Dispatchers.IO) {
-            DebugLog.d(TAG, "Initializing Vosk...")
+            DebugLog.d(TAG, "Initializing Vosk with model: $modelId")
 
-            // Check if model exists, if not download it
-            val modelPath = File(filesDir, "vosk-model-small-en-us-0.15")
+            // Check if model is installed
+            val modelPath = VoskModelDownloader.getModelPath(this@VoiceListenerService, modelId)
 
-            if (!modelPath.exists()) {
-                withContext(Dispatchers.Main) {
-                    updateNotification("Downloading wake word model...")
+            if (!VoskModelDownloader.isModelInstalled(this@VoiceListenerService, modelId)) {
+                DebugLog.d(TAG, "Model not found, downloading...")
+
+                // Find the model in available models
+                val modelToDownload = VoskModelDownloader.AVAILABLE_MODELS.find { it.id == modelId }
+
+                if (modelToDownload == null) {
+                    withContext(Dispatchers.Main) {
+                        DebugLog.e(TAG, "❌ Model $modelId not found in available models!")
+                        updateNotification("❌ Invalid model ID")
+                        stopListening()
+                    }
+                    return@withContext
                 }
-                DebugLog.d(TAG, "Model not found, need to download")
 
-                // Model needs to be downloaded - see instructions below
+                // Download the model
                 withContext(Dispatchers.Main) {
-                    DebugLog.e(TAG, "⚠️ Vosk model not found!")
-                    DebugLog.e(TAG, "Download model from: https://alphacephei.com/vosk/models")
-                    DebugLog.e(TAG, "Get 'vosk-model-small-en-us-0.15.zip' (40MB)")
-                    DebugLog.e(TAG, "Extract and place in: ${filesDir.absolutePath}/")
-                    updateNotification("❌ Wake word model required - see logs")
-                    stopListening()
+                    updateNotification("Downloading ${modelToDownload.name} (${modelToDownload.size})...")
                 }
-                return@withContext
+
+                val result = VoskModelDownloader.downloadModel(
+                    context = this@VoiceListenerService,
+                    model = modelToDownload
+                ) { progress ->
+                    serviceScope.launch(Dispatchers.Main) {
+                        updateNotification("Downloading ${modelToDownload.name}: $progress%")
+                    }
+                }
+
+                if (result.isFailure) {
+                    withContext(Dispatchers.Main) {
+                        val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                        DebugLog.e(TAG, "❌ Failed to download model: $error")
+                        updateNotification("❌ Download failed: $error")
+                        stopListening()
+                    }
+                    return@withContext
+                }
+
+                DebugLog.d(TAG, "✓ Model downloaded successfully")
             }
 
             DebugLog.d(TAG, "Loading Vosk model from: ${modelPath.absolutePath}")
