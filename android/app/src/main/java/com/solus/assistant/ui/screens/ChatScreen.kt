@@ -71,19 +71,21 @@ fun ChatScreen(
                 voiceService = binder.getService()
                 serviceConnected = true
                 isListening = voiceService?.isCurrentlyListening() ?: false
-
-                // Set callback for voice commands
-                voiceService?.setCommandRecognizedCallback { command ->
-                    listeningStatus = "Processing..."
-                    sendMessage(command, isVoice = true)
-                    listeningStatus = null
-                }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
                 serviceConnected = false
                 voiceService = null
             }
+        }
+    }
+
+    // Set up callback when service is connected
+    LaunchedEffect(voiceService) {
+        voiceService?.setCommandRecognizedCallback { command ->
+            listeningStatus = "Processing..."
+            sendMessage(command, isVoice = true)
+            listeningStatus = null
         }
     }
 
