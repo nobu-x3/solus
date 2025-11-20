@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +46,7 @@ fun MainScreen(
     var serverPort by remember { mutableStateOf("") }
     var userId by remember { mutableStateOf("") }
     var autoStart by remember { mutableStateOf(false) }
+    var textCommand by remember { mutableStateOf("") }
 
     // Load settings
     LaunchedEffect(Unit) {
@@ -205,6 +207,61 @@ fun MainScreen(
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                }
+            }
+
+            // Text Input Card
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Text Command (Backup)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        "Type your command manually",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = textCommand,
+                            onValueChange = { textCommand = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Type your request...") },
+                            singleLine = true,
+                            enabled = serviceConnected
+                        )
+                        IconButton(
+                            onClick = {
+                                if (textCommand.isNotBlank()) {
+                                    voiceService?.sendTextCommand(textCommand)
+                                    textCommand = ""
+                                }
+                            },
+                            enabled = serviceConnected && textCommand.isNotBlank()
+                        ) {
+                            Icon(
+                                Icons.Default.Send,
+                                "Send",
+                                tint = if (serviceConnected && textCommand.isNotBlank()) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
                     }
                 }
             }

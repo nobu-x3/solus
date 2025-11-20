@@ -262,8 +262,21 @@ class VoiceListenerService : Service() {
         if (wakeWordEnabled && !waitingForCommand) {
             if (lowerText.contains(wakeWord)) {
                 Log.d(TAG, "Wake word detected")
-                waitingForCommand = true
-                updateNotification("Listening for command...")
+
+                // Check if command is in the same phrase (after wake word)
+                val wakeWordIndex = lowerText.indexOf(wakeWord)
+                val commandText = text.substring(wakeWordIndex + wakeWord.length).trim()
+
+                if (commandText.isNotEmpty()) {
+                    // Wake word and command in same phrase, process immediately
+                    Log.d(TAG, "Command detected with wake word: $commandText")
+                    updateNotification("Processing: $commandText")
+                    sendToServer(commandText)
+                } else {
+                    // Only wake word detected, wait for next phrase
+                    waitingForCommand = true
+                    updateNotification("Listening for command...")
+                }
             }
             return
         }
@@ -386,6 +399,16 @@ class VoiceListenerService : Service() {
     }
 
     fun isCurrentlyListening(): Boolean = isListening
+
+    /**
+     * Send a text command to the server (for manual text input)
+     */
+    fun sendTextCommand(text: String) {
+        if (text.isBlank()) return
+        Log.d(TAG, "Sending text command: $text")
+        updateNotification("Processing: $text")
+        sendToServer(text)
+    }
 
     companion object {
         private const val TAG = "VoiceListenerService"
