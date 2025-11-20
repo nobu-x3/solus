@@ -44,7 +44,7 @@ class SettingsManager(val context: Context) {
         const val DEFAULT_SERVER_PORT = "8000"
         const val DEFAULT_WAKE_WORD = "hey solus"
         const val DEFAULT_MODEL_ID = "vosk-model-small-en-us-0.15"
-        const val DEFAULT_TTS_VOICE_ID = "en_US-lessac-low"
+        const val DEFAULT_TTS_VOICE_ID = "en-US"
     }
 
     private val gson = Gson()

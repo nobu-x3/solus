@@ -7,10 +7,10 @@ import com.google.gson.annotations.SerializedName
  */
 data class ServerAction(
     @SerializedName("type")
-    val type: String,
+    val type: String?,
 
     @SerializedName("params")
-    val params: Map<String, Any>
+    val params: Map<String, Any>?
 )
 
 /**
