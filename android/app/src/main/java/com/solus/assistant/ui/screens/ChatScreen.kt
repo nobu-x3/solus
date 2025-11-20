@@ -56,6 +56,7 @@ fun ChatScreen(
     var voiceService: VoiceListenerService? by remember { mutableStateOf(null) }
     var isSending by remember { mutableStateOf(false) }
     var listeningStatus by remember { mutableStateOf<String?>(null) }
+    var isPendingResponse by remember { mutableStateOf(false) }
 
     // Load conversation ID and chat history
     var conversationId by remember { mutableStateOf<String?>(null) }
@@ -67,6 +68,12 @@ fun ChatScreen(
             settingsManager.chatHistory.collect { history ->
                 android.util.Log.d("ChatScreen", "Loaded ${history.size} messages from history")
                 messages = history
+            }
+        }
+        launch {
+            settingsManager.isPendingResponse.collect { isPending ->
+                android.util.Log.d("ChatScreen", "isPendingResponse changed to: $isPending")
+                isPendingResponse = isPending
             }
         }
     }
@@ -188,6 +195,10 @@ fun ChatScreen(
         voiceService?.setCommandRecognizedCallback { command ->
             android.util.Log.d("ChatScreen", "Callback received command: '$command'")
             listeningStatus = "Processing..."
+            // Clear any stale pending state since ChatScreen is handling this
+            scope.launch {
+                settingsManager.setPendingResponse(false)
+            }
             sendMessage(command, isVoice = true)
             listeningStatus = null
         }
@@ -247,7 +258,7 @@ fun ChatScreen(
                 }
 
                 // Show loading indicator when waiting for server
-                if (isSending) {
+                if (isSending || isPendingResponse) {
                     item {
                         Row(
                             modifier = Modifier

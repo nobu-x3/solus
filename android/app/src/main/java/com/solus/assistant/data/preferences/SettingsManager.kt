@@ -35,6 +35,7 @@ class SettingsManager(val context: Context) {
         private val VOSK_MODEL_ID = stringPreferencesKey("vosk_model_id")
         private val FIRST_RUN_COMPLETE = booleanPreferencesKey("first_run_complete")
         private val CHAT_HISTORY = stringPreferencesKey("chat_history")
+        private val IS_PENDING_RESPONSE = booleanPreferencesKey("is_pending_response")
 
         // Default values
         const val DEFAULT_SERVER_HOST = "http://10.0.2.2" // Emulator localhost
@@ -278,6 +279,22 @@ class SettingsManager(val context: Context) {
     suspend fun clearChatHistory() {
         context.dataStore.edit { preferences ->
             preferences[CHAT_HISTORY] = "[]"
+        }
+    }
+
+    /**
+     * Get pending response state
+     */
+    val isPendingResponse: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[IS_PENDING_RESPONSE] ?: false
+    }
+
+    /**
+     * Set pending response state
+     */
+    suspend fun setPendingResponse(isPending: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_PENDING_RESPONSE] = isPending
         }
     }
 }
