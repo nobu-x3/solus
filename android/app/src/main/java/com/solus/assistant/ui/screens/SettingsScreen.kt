@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
+import com.solus.assistant.util.PiperTTSManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,6 +38,9 @@ fun SettingsScreen(
     var wakeWord by remember { mutableStateOf("") }
     var connectionStatus by remember { mutableStateOf<ConnectionStatus>(ConnectionStatus.Idle) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var ttsEnabled by remember { mutableStateOf(false) }
+    var ttsVoiceId by remember { mutableStateOf("") }
+    var expandedVoiceDropdown by remember { mutableStateOf(false) }
 
     // Load settings
     LaunchedEffect(Unit) {
@@ -57,6 +61,12 @@ fun SettingsScreen(
         }
         launch {
             settingsManager.wakeWord.collect { wakeWord = it }
+        }
+        launch {
+            settingsManager.ttsEnabled.collect { ttsEnabled = it }
+        }
+        launch {
+            settingsManager.ttsVoiceId.collect { ttsVoiceId = it }
         }
     }
 
@@ -263,6 +273,77 @@ fun SettingsScreen(
 
             Divider()
 
+            // TTS (Text-to-Speech) Section
+            Text(
+                text = "Text-to-Speech",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Enable TTS", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Read responses aloud for voice commands",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = ttsEnabled,
+                    onCheckedChange = { ttsEnabled = it }
+                )
+            }
+
+            if (ttsEnabled) {
+                // Voice selection dropdown
+                ExposedDropdownMenuBox(
+                    expanded = expandedVoiceDropdown,
+                    onExpandedChange = { expandedVoiceDropdown = !expandedVoiceDropdown }
+                ) {
+                    OutlinedTextField(
+                        value = PiperTTSManager.AVAILABLE_VOICES.find { it.id == ttsVoiceId }?.name ?: "Select voice",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Voice") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedVoiceDropdown) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedVoiceDropdown,
+                        onDismissRequest = { expandedVoiceDropdown = false }
+                    ) {
+                        PiperTTSManager.AVAILABLE_VOICES.forEach { voice ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(voice.name)
+                                        Text(
+                                            "${voice.language} • ${voice.quality} • ${voice.size}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    ttsVoiceId = voice.id
+                                    expandedVoiceDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
             // Chat History Section
             Text(
                 text = "Chat History",
@@ -293,6 +374,8 @@ fun SettingsScreen(
                         settingsManager.setAutoStart(autoStart)
                         settingsManager.setWakeWordEnabled(wakeWordEnabled)
                         settingsManager.setWakeWord(wakeWord)
+                        settingsManager.setTtsEnabled(ttsEnabled)
+                        settingsManager.setTtsVoiceId(ttsVoiceId)
                         // Reset Retrofit client to use new settings
                         RetrofitClient.reset()
                         onNavigateBack()

@@ -36,12 +36,15 @@ class SettingsManager(val context: Context) {
         private val FIRST_RUN_COMPLETE = booleanPreferencesKey("first_run_complete")
         private val CHAT_HISTORY = stringPreferencesKey("chat_history")
         private val IS_PENDING_RESPONSE = booleanPreferencesKey("is_pending_response")
+        private val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
+        private val TTS_VOICE_ID = stringPreferencesKey("tts_voice_id")
 
         // Default values
         const val DEFAULT_SERVER_HOST = "http://10.0.2.2" // Emulator localhost
         const val DEFAULT_SERVER_PORT = "8000"
         const val DEFAULT_WAKE_WORD = "hey solus"
         const val DEFAULT_MODEL_ID = "vosk-model-small-en-us-0.15"
+        const val DEFAULT_TTS_VOICE_ID = "en_US-lessac-low"
     }
 
     private val gson = Gson()
@@ -121,6 +124,20 @@ class SettingsManager(val context: Context) {
      */
     val isFirstRunComplete: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[FIRST_RUN_COMPLETE] ?: false
+    }
+
+    /**
+     * Get TTS enabled preference
+     */
+    val ttsEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[TTS_ENABLED] ?: false
+    }
+
+    /**
+     * Get selected TTS voice ID
+     */
+    val ttsVoiceId: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[TTS_VOICE_ID] ?: DEFAULT_TTS_VOICE_ID
     }
 
     /**
@@ -205,6 +222,24 @@ class SettingsManager(val context: Context) {
     suspend fun setFirstRunComplete(complete: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[FIRST_RUN_COMPLETE] = complete
+        }
+    }
+
+    /**
+     * Update TTS enabled preference
+     */
+    suspend fun setTtsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[TTS_ENABLED] = enabled
+        }
+    }
+
+    /**
+     * Update TTS voice ID
+     */
+    suspend fun setTtsVoiceId(voiceId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[TTS_VOICE_ID] = voiceId
         }
     }
 
