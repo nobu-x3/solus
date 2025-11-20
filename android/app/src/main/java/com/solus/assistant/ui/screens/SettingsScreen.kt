@@ -322,16 +322,7 @@ fun SettingsScreen(
                     ) {
                         AndroidTTSManager.AVAILABLE_VOICES.forEach { voice ->
                             DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(voice.name)
-                                        Text(
-                                            "${voice.language} • ${voice.quality} • ${voice.size}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                },
+                                text = { Text(voice.name) },
                                 onClick = {
                                     ttsVoiceId = voice.id
                                     expandedVoiceDropdown = false
