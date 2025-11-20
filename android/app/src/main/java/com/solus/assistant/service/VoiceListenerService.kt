@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import com.solus.assistant.MainActivity
 import com.solus.assistant.util.BeepGenerator
 import com.solus.assistant.util.DebugLog
+import com.solus.assistant.util.PiperTTSManager
 import com.solus.assistant.util.VoskModelDownloader
 import com.solus.assistant.data.model.ChatMessage
 import com.solus.assistant.data.model.ChatRequest
@@ -46,6 +47,7 @@ class VoiceListenerService : Service() {
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var settingsManager: SettingsManager
     private lateinit var actionExecutor: ActionExecutor
+    private lateinit var ttsManager: PiperTTSManager
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var isListening = false
@@ -88,6 +90,7 @@ class VoiceListenerService : Service() {
 
         settingsManager = SettingsManager(this)
         actionExecutor = ActionExecutor(this)
+        ttsManager = PiperTTSManager(this)
 
         createNotificationChannel()
         // Don't call startForeground() here - Android 14 requires user interaction first
@@ -105,6 +108,17 @@ class VoiceListenerService : Service() {
             }
             launch {
                 settingsManager.voskModelId.collect { modelId = it }
+            }
+            launch {
+                settingsManager.ttsVoiceId.collect { voiceId ->
+                    DebugLog.d(TAG, "TTS voice ID updated to: '$voiceId'")
+                    // Initialize TTS if voice is installed
+                    if (ttsManager.isVoiceInstalled(voiceId)) {
+                        ttsManager.initialize(voiceId)
+                    } else {
+                        DebugLog.d(TAG, "TTS voice not installed: $voiceId")
+                    }
+                }
             }
         }
     }
@@ -129,6 +143,7 @@ class VoiceListenerService : Service() {
         super.onDestroy()
         DebugLog.d(TAG, "Service destroyed")
         stopListening()
+        ttsManager.release()
         serviceScope.cancel()
     }
 
@@ -569,6 +584,13 @@ class VoiceListenerService : Service() {
 
                         // Clear pending state
                         settingsManager.setPendingResponse(false)
+
+                        // Speak response if TTS is enabled
+                        val ttsEnabled = settingsManager.ttsEnabled.first()
+                        if (ttsEnabled) {
+                            DebugLog.d(TAG, "Speaking response via TTS")
+                            ttsManager.speak(chatResponse.response)
+                        }
 
                         // Execute action if present
                         chatResponse.action?.let { action ->
