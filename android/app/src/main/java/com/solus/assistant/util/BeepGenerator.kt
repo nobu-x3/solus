@@ -16,6 +16,7 @@ object BeepGenerator {
      * Play wake word detected beep (higher pitch, short)
      */
     fun playWakeWordBeep() {
+        android.util.Log.d("BeepGenerator", "Playing wake word beep")
         playBeep(800.0, 150) // 800 Hz, 150ms
     }
 
@@ -23,6 +24,7 @@ object BeepGenerator {
      * Play request sent beep (lower pitch, short)
      */
     fun playRequestSentBeep() {
+        android.util.Log.d("BeepGenerator", "Playing request sent beep")
         playBeep(600.0, 100) // 600 Hz, 100ms
     }
 
@@ -32,6 +34,7 @@ object BeepGenerator {
      * @param durationMs Duration in milliseconds
      */
     private fun playBeep(frequency: Double, durationMs: Int) {
+        android.util.Log.d("BeepGenerator", "playBeep called: ${frequency}Hz, ${durationMs}ms")
         Thread {
             try {
                 val numSamples = (durationMs * SAMPLE_RATE) / 1000
@@ -78,7 +81,9 @@ object BeepGenerator {
                 Thread.sleep(durationMs.toLong())
                 audioTrack.stop()
                 audioTrack.release()
+                android.util.Log.d("BeepGenerator", "Beep playback completed")
             } catch (e: Exception) {
+                android.util.Log.e("BeepGenerator", "Error playing beep", e)
                 e.printStackTrace()
             }
         }.start()
