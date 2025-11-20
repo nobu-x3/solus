@@ -123,8 +123,10 @@ class VoiceListenerService : Service() {
                         SettingsManager.DEFAULT_TTS_VOICE_ID
                     }
 
-                    // Initialize TTS with valid voice
-                    ttsManager.initialize(validVoiceId)
+                    // Initialize TTS with valid voice (await completion)
+                    ttsManager.initialize(validVoiceId).onFailure { error ->
+                        DebugLog.e(TAG, "Failed to initialize TTS: ${error.message}")
+                    }
                 }
             }
         }
