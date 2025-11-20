@@ -100,6 +100,9 @@ dependencies {
     // Accompanist (permissions)
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
 
+    // Vosk wake word detection (free, open source, on-device)
+    implementation("com.alphacephei:vosk-android:0.3.47")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
