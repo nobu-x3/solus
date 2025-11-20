@@ -3,7 +3,9 @@ package com.solus.assistant.util
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.*
+import kotlin.coroutines.resume
 
 /**
  * Manages Android's built-in Text-to-Speech functionality
@@ -32,56 +34,72 @@ class AndroidTTSManager(private val context: Context) {
     private var currentVoiceId: String? = null
 
     /**
-     * Initialize TTS engine
+     * Initialize TTS engine (suspend function that waits for initialization)
      */
-    fun initialize(voiceId: String = "en-US", onReady: (() -> Unit)? = null): Result<Unit> {
-        try {
+    suspend fun initialize(voiceId: String = "en-US"): Result<Unit> {
+        return try {
             DebugLog.d(TAG, "Initializing TTS with voice: $voiceId")
 
-            tts = TextToSpeech(context) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    val voice = AVAILABLE_VOICES.find { it.id == voiceId }
-                    if (voice != null) {
-                        val result = tts?.setLanguage(voice.locale)
-                        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                            DebugLog.e(TAG, "Language not supported: ${voice.locale}")
-                            isInitialized = false
-                        } else {
-                            DebugLog.d(TAG, "✓ TTS initialized successfully")
-                            isInitialized = true
-                            currentVoiceId = voiceId
-
-                            // Set speech rate slightly faster
-                            tts?.setSpeechRate(1.1f)
-
-                            onReady?.invoke()
-                        }
-                    }
-                } else {
-                    DebugLog.e(TAG, "TTS initialization failed with status: $status")
-                    isInitialized = false
-                }
+            // If already initialized with this voice, skip
+            if (isInitialized && currentVoiceId == voiceId && tts != null) {
+                DebugLog.d(TAG, "TTS already initialized with voice: $voiceId")
+                return Result.success(Unit)
             }
 
-            // Set utterance progress listener
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    DebugLog.d(TAG, "TTS started speaking")
-                }
+            // Release old instance if exists
+            release()
 
-                override fun onDone(utteranceId: String?) {
-                    DebugLog.d(TAG, "TTS finished speaking")
-                }
+            // Wait for TTS initialization using coroutine
+            suspendCancellableCoroutine { continuation ->
+                tts = TextToSpeech(context) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        val voice = AVAILABLE_VOICES.find { it.id == voiceId }
+                        if (voice != null) {
+                            val result = tts?.setLanguage(voice.locale)
+                            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                                DebugLog.e(TAG, "Language not supported: ${voice.locale}")
+                                isInitialized = false
+                                continuation.resume(Result.failure(Exception("Language not supported")))
+                            } else {
+                                DebugLog.d(TAG, "✓ TTS initialized successfully")
+                                isInitialized = true
+                                currentVoiceId = voiceId
 
-                override fun onError(utteranceId: String?) {
-                    DebugLog.e(TAG, "TTS error occurred")
-                }
-            })
+                                // Set speech rate slightly faster
+                                tts?.setSpeechRate(1.1f)
 
-            return Result.success(Unit)
+                                // Set utterance progress listener
+                                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                                    override fun onStart(utteranceId: String?) {
+                                        DebugLog.d(TAG, "TTS started speaking")
+                                    }
+
+                                    override fun onDone(utteranceId: String?) {
+                                        DebugLog.d(TAG, "TTS finished speaking")
+                                    }
+
+                                    override fun onError(utteranceId: String?) {
+                                        DebugLog.e(TAG, "TTS error occurred")
+                                    }
+                                })
+
+                                continuation.resume(Result.success(Unit))
+                            }
+                        } else {
+                            DebugLog.e(TAG, "Voice not found: $voiceId")
+                            isInitialized = false
+                            continuation.resume(Result.failure(Exception("Voice not found")))
+                        }
+                    } else {
+                        DebugLog.e(TAG, "TTS initialization failed with status: $status")
+                        isInitialized = false
+                        continuation.resume(Result.failure(Exception("TTS init failed")))
+                    }
+                }
+            }
         } catch (e: Exception) {
             DebugLog.e(TAG, "Failed to initialize TTS: ${e.message}", e)
-            return Result.failure(e)
+            Result.failure(e)
         }
     }
 
@@ -91,10 +109,8 @@ class AndroidTTSManager(private val context: Context) {
     fun speak(text: String): Result<Unit> {
         return try {
             if (!isInitialized || tts == null) {
-                DebugLog.w(TAG, "TTS not initialized, initializing now...")
-                initialize(currentVoiceId ?: "en-US")
-                // Wait a bit for initialization
-                Thread.sleep(500)
+                DebugLog.w(TAG, "TTS not initialized, cannot speak")
+                return Result.failure(Exception("TTS not initialized"))
             }
 
             DebugLog.d(TAG, "Speaking: $text")
