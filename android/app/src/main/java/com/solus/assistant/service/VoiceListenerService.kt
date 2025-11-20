@@ -63,7 +63,7 @@ class VoiceListenerService : Service() {
         actionExecutor = ActionExecutor(this)
 
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification("Ready to listen"))
+        // Don't call startForeground() here - Android 14 requires user interaction first
 
         // Load settings
         serviceScope.launch {
@@ -113,7 +113,9 @@ class VoiceListenerService : Service() {
 
         DebugLog.d(TAG, "Starting Vosk wake word detection")
         isListening = true
-        updateNotification("Initializing wake word...")
+
+        // Start as foreground service (Android 14 requires this happens when user initiates)
+        startForeground(NOTIFICATION_ID, createNotification("Initializing wake word..."))
 
         serviceScope.launch(Dispatchers.IO) {
             try {
