@@ -19,7 +19,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 /**
  * Settings manager using DataStore for persistent storage
  */
-class SettingsManager(private val context: Context) {
+class SettingsManager(val context: Context) {
 
     companion object {
         private val SERVER_HOST = stringPreferencesKey("server_host")
@@ -29,11 +29,14 @@ class SettingsManager(private val context: Context) {
         private val AUTO_START = booleanPreferencesKey("auto_start")
         private val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")
         private val WAKE_WORD = stringPreferencesKey("wake_word")
+        private val VOSK_MODEL_ID = stringPreferencesKey("vosk_model_id")
+        private val FIRST_RUN_COMPLETE = booleanPreferencesKey("first_run_complete")
 
         // Default values
         const val DEFAULT_SERVER_HOST = "http://10.0.2.2" // Emulator localhost
         const val DEFAULT_SERVER_PORT = "8000"
         const val DEFAULT_WAKE_WORD = "hey solus"
+        const val DEFAULT_MODEL_ID = "vosk-model-small-en-us-0.15"
     }
 
     /**
@@ -100,6 +103,20 @@ class SettingsManager(private val context: Context) {
     }
 
     /**
+     * Get selected Vosk model ID
+     */
+    val voskModelId: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[VOSK_MODEL_ID] ?: DEFAULT_MODEL_ID
+    }
+
+    /**
+     * Check if first run is complete
+     */
+    val isFirstRunComplete: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[FIRST_RUN_COMPLETE] ?: false
+    }
+
+    /**
      * Update server host
      */
     suspend fun setServerHost(host: String) {
@@ -163,6 +180,24 @@ class SettingsManager(private val context: Context) {
     suspend fun setWakeWord(word: String) {
         context.dataStore.edit { preferences ->
             preferences[WAKE_WORD] = word
+        }
+    }
+
+    /**
+     * Update Vosk model ID
+     */
+    suspend fun setVoskModelId(modelId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[VOSK_MODEL_ID] = modelId
+        }
+    }
+
+    /**
+     * Mark first run as complete
+     */
+    suspend fun setFirstRunComplete(complete: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FIRST_RUN_COMPLETE] = complete
         }
     }
 
