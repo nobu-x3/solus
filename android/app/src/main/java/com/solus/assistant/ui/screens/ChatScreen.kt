@@ -80,15 +80,6 @@ fun ChatScreen(
         }
     }
 
-    // Set up callback when service is connected
-    LaunchedEffect(voiceService) {
-        voiceService?.setCommandRecognizedCallback { command ->
-            listeningStatus = "Processing..."
-            sendMessage(command, isVoice = true)
-            listeningStatus = null
-        }
-    }
-
     // Bind to service
     DisposableEffect(Unit) {
         val intent = Intent(context, VoiceListenerService::class.java)
@@ -166,6 +157,15 @@ fun ChatScreen(
             } finally {
                 isSending = false
             }
+        }
+    }
+
+    // Set up callback when service is connected
+    LaunchedEffect(voiceService) {
+        voiceService?.setCommandRecognizedCallback { command ->
+            listeningStatus = "Processing..."
+            sendMessage(command, isVoice = true)
+            listeningStatus = null
         }
     }
 
