@@ -145,6 +145,7 @@ class VoiceListenerService : Service() {
 
         DebugLog.d(TAG, "Stopping listening")
         isListening = false
+        isProcessingCommand = false // Reset this flag!
         voskService?.stop()
         voskService?.shutdown()
         voskService = null
