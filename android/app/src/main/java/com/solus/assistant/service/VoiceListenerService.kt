@@ -13,9 +13,9 @@ import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.solus.assistant.MainActivity
+import com.solus.assistant.util.DebugLog
 import com.solus.assistant.data.model.ChatRequest
 import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
@@ -46,7 +46,7 @@ class VoiceListenerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
+        DebugLog.d(TAG, "Service created")
 
         settingsManager = SettingsManager(this)
         actionExecutor = ActionExecutor(this)
@@ -69,7 +69,7 @@ class VoiceListenerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "Service started")
+        DebugLog.d(TAG, "Service started")
 
         when (intent?.action) {
             ACTION_START_LISTENING -> startListening()
@@ -86,7 +86,7 @@ class VoiceListenerService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Service destroyed")
+        DebugLog.d(TAG, "Service destroyed")
         stopListening()
         serviceScope.cancel()
     }
@@ -96,11 +96,11 @@ class VoiceListenerService : Service() {
      */
     fun startListening() {
         if (isListening) {
-            Log.d(TAG, "Already listening")
+            DebugLog.d(TAG, "Already listening")
             return
         }
 
-        Log.d(TAG, "Starting to listen")
+        DebugLog.d(TAG, "Starting to listen")
         isListening = true
         waitingForCommand = false
         updateNotification("Listening...")
@@ -112,11 +112,11 @@ class VoiceListenerService : Service() {
      */
     fun stopListening() {
         if (!isListening) {
-            Log.d(TAG, "Not listening")
+            DebugLog.d(TAG, "Not listening")
             return
         }
 
-        Log.d(TAG, "Stopping listening")
+        DebugLog.d(TAG, "Stopping listening")
         isListening = false
         waitingForCommand = false
         speechRecognizer?.destroy()
@@ -139,37 +139,37 @@ class VoiceListenerService : Service() {
      * Initialize speech recognizer
      */
     private fun initializeSpeechRecognizer() {
-        Log.d(TAG, "Initializing speech recognizer")
+        DebugLog.d(TAG, "Initializing speech recognizer")
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Log.e(TAG, "❌ Speech recognition NOT AVAILABLE on this device!")
-            Log.e(TAG, "This usually means:")
-            Log.e(TAG, "  1. You're on an emulator without Google Play Services")
-            Log.e(TAG, "  2. Google app / speech services not installed")
-            Log.e(TAG, "  3. No internet connection (required for speech recognition)")
+            DebugLog.e(TAG, "❌ Speech recognition NOT AVAILABLE on this device!")
+            DebugLog.e(TAG, "This usually means:")
+            DebugLog.e(TAG, "  1. You're on an emulator without Google Play Services")
+            DebugLog.e(TAG, "  2. Google app / speech services not installed")
+            DebugLog.e(TAG, "  3. No internet connection (required for speech recognition)")
             updateNotification("❌ Speech recognition unavailable")
             stopListening()
             return
         }
 
-        Log.d(TAG, "✓ Speech recognition is available")
+        DebugLog.d(TAG, "✓ Speech recognition is available")
 
         speechRecognizer?.destroy()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
 
         if (speechRecognizer == null) {
-            Log.e(TAG, "❌ Failed to create SpeechRecognizer instance!")
+            DebugLog.e(TAG, "❌ Failed to create SpeechRecognizer instance!")
             updateNotification("Failed to create recognizer")
             stopListening()
             return
         }
 
-        Log.d(TAG, "✓ SpeechRecognizer created successfully")
+        DebugLog.d(TAG, "✓ SpeechRecognizer created successfully")
 
         speechRecognizer?.apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
-                    Log.d(TAG, "Ready for speech")
+                    DebugLog.d(TAG, "Ready for speech")
                     val status = if (wakeWordEnabled && !waitingForCommand) {
                         "Say \"$wakeWord\""
                     } else {
@@ -179,7 +179,7 @@ class VoiceListenerService : Service() {
                 }
 
                 override fun onBeginningOfSpeech() {
-                    Log.d(TAG, "Speech started")
+                    DebugLog.d(TAG, "Speech started")
                 }
 
                 override fun onRmsChanged(rmsdB: Float) {
@@ -191,7 +191,7 @@ class VoiceListenerService : Service() {
                 }
 
                 override fun onEndOfSpeech() {
-                    Log.d(TAG, "Speech ended")
+                    DebugLog.d(TAG, "Speech ended")
                 }
 
                 override fun onError(error: Int) {
@@ -210,9 +210,9 @@ class VoiceListenerService : Service() {
 
                     // Only log actual errors (not "no match" which is normal)
                     if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                        Log.e(TAG, "❌ Speech recognition error [$error]: $errorMessage")
+                        DebugLog.e(TAG, "❌ Speech recognition error [$error]: $errorMessage")
                     } else {
-                        Log.d(TAG, "No speech detected, continuing to listen...")
+                        DebugLog.d(TAG, "No speech detected, continuing to listen...")
                     }
 
                     // Show important errors in notification
@@ -237,7 +237,7 @@ class VoiceListenerService : Service() {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     if (!matches.isNullOrEmpty()) {
                         val text = matches[0]
-                        Log.d(TAG, "Recognized: $text")
+                        DebugLog.d(TAG, "Recognized: $text")
                         handleRecognizedText(text)
                     }
 
@@ -269,10 +269,10 @@ class VoiceListenerService : Service() {
      * Start speech recognition
      */
     private fun startRecognition() {
-        Log.d(TAG, "Starting speech recognition...")
+        DebugLog.d(TAG, "Starting speech recognition...")
 
         if (speechRecognizer == null) {
-            Log.e(TAG, "❌ Cannot start recognition - SpeechRecognizer is null!")
+            DebugLog.e(TAG, "❌ Cannot start recognition - SpeechRecognizer is null!")
             return
         }
 
@@ -281,13 +281,17 @@ class VoiceListenerService : Service() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            // Extended silence tolerance to reduce beeping/restarts
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
         }
 
         try {
             speechRecognizer?.startListening(intent)
-            Log.d(TAG, "✓ Speech recognition started successfully")
+            DebugLog.d(TAG, "✓ Speech recognition started successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Exception starting recognition: ${e.message}", e)
+            DebugLog.e(TAG, "❌ Exception starting recognition: ${e.message}", e)
             updateNotification("Error: ${e.message}")
         }
     }
@@ -301,7 +305,7 @@ class VoiceListenerService : Service() {
         // Check for wake word if enabled
         if (wakeWordEnabled && !waitingForCommand) {
             if (lowerText.contains(wakeWord)) {
-                Log.d(TAG, "Wake word detected")
+                DebugLog.d(TAG, "Wake word detected")
 
                 // Check if command is in the same phrase (after wake word)
                 val wakeWordIndex = lowerText.indexOf(wakeWord)
@@ -309,7 +313,7 @@ class VoiceListenerService : Service() {
 
                 if (commandText.isNotEmpty()) {
                     // Wake word and command in same phrase, process immediately
-                    Log.d(TAG, "Command detected with wake word: $commandText")
+                    DebugLog.d(TAG, "Command detected with wake word: $commandText")
                     updateNotification("Processing: $commandText")
                     sendToServer(commandText)
                 } else {
@@ -341,7 +345,7 @@ class VoiceListenerService : Service() {
                 val userId = settingsManager.userId.first()
                 val api = RetrofitClient.getInstance(baseUrl)
 
-                Log.d(TAG, "Sending to server: $text")
+                DebugLog.d(TAG, "Sending to server: $text")
                 updateNotification("Sending to server...")
 
                 val request = ChatRequest(
@@ -355,13 +359,13 @@ class VoiceListenerService : Service() {
                 if (response.isSuccessful) {
                     val chatResponse = response.body()
                     if (chatResponse != null) {
-                        Log.d(TAG, "Response: ${chatResponse.response}")
+                        DebugLog.d(TAG, "Response: ${chatResponse.response}")
                         conversationId = chatResponse.conversationId
                         settingsManager.setConversationId(conversationId)
 
                         // Execute action if present
                         chatResponse.action?.let { action ->
-                            Log.d(TAG, "Executing action: ${action.type}")
+                            DebugLog.d(TAG, "Executing action: ${action.type}")
                             actionExecutor.executeAction(action)
                         }
 
@@ -381,11 +385,11 @@ class VoiceListenerService : Service() {
                         }
                     }
                 } else {
-                    Log.e(TAG, "Server error: ${response.code()} ${response.message()}")
+                    DebugLog.e(TAG, "Server error: ${response.code()} ${response.message()}")
                     updateNotification("Server error: ${response.code()}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error sending to server", e)
+                DebugLog.e(TAG, "Error sending to server", e)
                 updateNotification("Error: ${e.message}")
             }
         }
@@ -445,7 +449,7 @@ class VoiceListenerService : Service() {
      */
     fun sendTextCommand(text: String) {
         if (text.isBlank()) return
-        Log.d(TAG, "Sending text command: $text")
+        DebugLog.d(TAG, "Sending text command: $text")
         updateNotification("Processing: $text")
         sendToServer(text)
     }
