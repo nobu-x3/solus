@@ -54,7 +54,7 @@ fun SetupScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 LinearProgressIndicator(
-                    progress = { downloadProgress / 100f },
+                    progress = downloadProgress / 100f,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp),
@@ -200,6 +200,7 @@ fun SetupScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelSelectionCard(
     model: VoskModelDownloader.VoskModel,
