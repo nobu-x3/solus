@@ -139,15 +139,34 @@ class VoiceListenerService : Service() {
      * Initialize speech recognizer
      */
     private fun initializeSpeechRecognizer() {
+        Log.d(TAG, "Initializing speech recognizer")
+
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Log.e(TAG, "Speech recognition not available")
-            updateNotification("Speech recognition not available")
+            Log.e(TAG, "❌ Speech recognition NOT AVAILABLE on this device!")
+            Log.e(TAG, "This usually means:")
+            Log.e(TAG, "  1. You're on an emulator without Google Play Services")
+            Log.e(TAG, "  2. Google app / speech services not installed")
+            Log.e(TAG, "  3. No internet connection (required for speech recognition)")
+            updateNotification("❌ Speech recognition unavailable")
             stopListening()
             return
         }
 
+        Log.d(TAG, "✓ Speech recognition is available")
+
         speechRecognizer?.destroy()
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+
+        if (speechRecognizer == null) {
+            Log.e(TAG, "❌ Failed to create SpeechRecognizer instance!")
+            updateNotification("Failed to create recognizer")
+            stopListening()
+            return
+        }
+
+        Log.d(TAG, "✓ SpeechRecognizer created successfully")
+
+        speechRecognizer?.apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     Log.d(TAG, "Ready for speech")
@@ -176,20 +195,32 @@ class VoiceListenerService : Service() {
                 }
 
                 override fun onError(error: Int) {
-                    Log.e(TAG, "Speech recognition error: $error")
                     val errorMessage = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error - Check microphone"
                         SpeechRecognizer.ERROR_CLIENT -> "Client error"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No match"
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "MICROPHONE PERMISSION DENIED"
+                        SpeechRecognizer.ERROR_NETWORK -> "Network error - Internet required for speech recognition"
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout - Check internet connection"
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected" // Normal, not an error
                         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
-                        SpeechRecognizer.ERROR_SERVER -> "Server error"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout"
-                        else -> "Unknown error"
+                        SpeechRecognizer.ERROR_SERVER -> "Google speech server error"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected (timeout)"
+                        else -> "Unknown error code: $error"
                     }
-                    Log.e(TAG, "Error: $errorMessage")
+
+                    // Only log actual errors (not "no match" which is normal)
+                    if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                        Log.e(TAG, "❌ Speech recognition error [$error]: $errorMessage")
+                    } else {
+                        Log.d(TAG, "No speech detected, continuing to listen...")
+                    }
+
+                    // Show important errors in notification
+                    if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                        updateNotification("❌ Microphone permission required")
+                    } else if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
+                        updateNotification("⚠️ No internet connection")
+                    }
 
                     // Restart listening after a short delay (except for permission errors)
                     if (isListening && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
@@ -238,6 +269,13 @@ class VoiceListenerService : Service() {
      * Start speech recognition
      */
     private fun startRecognition() {
+        Log.d(TAG, "Starting speech recognition...")
+
+        if (speechRecognizer == null) {
+            Log.e(TAG, "❌ Cannot start recognition - SpeechRecognizer is null!")
+            return
+        }
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
@@ -247,8 +285,10 @@ class VoiceListenerService : Service() {
 
         try {
             speechRecognizer?.startListening(intent)
+            Log.d(TAG, "✓ Speech recognition started successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Error starting recognition", e)
+            Log.e(TAG, "❌ Exception starting recognition: ${e.message}", e)
+            updateNotification("Error: ${e.message}")
         }
     }
 

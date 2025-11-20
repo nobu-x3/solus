@@ -1,13 +1,20 @@
 package com.solus.assistant.ui.screens
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Build
+import android.os.IBinder
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -21,7 +28,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
-import com.solus.assistant.ui.screens.ConnectionStatus
+import com.solus.assistant.service.VoiceListenerService
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -39,6 +46,36 @@ fun MainScreen(
     var serverHost by remember { mutableStateOf("") }
     var serverPort by remember { mutableStateOf("") }
     var connectionStatus by remember { mutableStateOf<ConnectionStatus>(ConnectionStatus.Idle) }
+    var isListening by remember { mutableStateOf(false) }
+    var serviceConnected by remember { mutableStateOf(false) }
+    var voiceService: VoiceListenerService? by remember { mutableStateOf(null) }
+
+    // Service connection
+    val serviceConnection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as VoiceListenerService.LocalBinder
+                voiceService = binder.getService()
+                serviceConnected = true
+                isListening = voiceService?.isCurrentlyListening() ?: false
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                serviceConnected = false
+                voiceService = null
+            }
+        }
+    }
+
+    // Bind to service
+    DisposableEffect(Unit) {
+        val intent = Intent(context, VoiceListenerService::class.java)
+        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+        onDispose {
+            context.unbindService(serviceConnection)
+        }
+    }
 
     // Load settings
     LaunchedEffect(Unit) {
@@ -223,6 +260,90 @@ fun MainScreen(
                         ) {
                             Text("Grant Permissions")
                         }
+                    }
+                }
+            }
+
+            // Voice Listener Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isListening) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Voice Assistant",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            if (isListening) "Listening" else "Stopped",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (isListening) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+
+                    if (isListening) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text(
+                            "Listening in background. App can be closed.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (isListening) {
+                                voiceService?.stopListening()
+                                isListening = false
+                            } else {
+                                val intent = Intent(context, VoiceListenerService::class.java).apply {
+                                    action = VoiceListenerService.ACTION_START_LISTENING
+                                }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    context.startForegroundService(intent)
+                                } else {
+                                    context.startService(intent)
+                                }
+                                voiceService?.startListening()
+                                isListening = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = permissionsState.allPermissionsGranted && serviceConnected,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isListening) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
+                        )
+                    ) {
+                        Icon(
+                            if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                            null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isListening) "Stop Listening" else "Start Listening")
                     }
                 }
             }
