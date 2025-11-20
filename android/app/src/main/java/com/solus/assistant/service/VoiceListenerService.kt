@@ -320,16 +320,16 @@ class VoiceListenerService : Service() {
                 // Play request sent beep
                 BeepGenerator.playRequestSentBeep()
 
-                // Send command to callback
+                // Send command to callback if ChatScreen is active, otherwise send to server
                 if (onCommandRecognizedCallback != null) {
                     DebugLog.d(TAG, "Invoking callback with command: '$commandText'")
                     onCommandRecognizedCallback?.invoke(commandText)
+                    returnToWakeWordListening()
                 } else {
-                    DebugLog.e(TAG, "No callback set! Command will be lost: '$commandText'")
+                    DebugLog.d(TAG, "No callback set, sending to server directly: '$commandText'")
+                    updateNotification("Processing: $commandText")
+                    sendToServer(commandText)
                 }
-
-                // Return to wake word listening after callback
-                returnToWakeWordListening()
             } else {
                 // User said just "solus" - wait for command via Google Speech
                 onWakeWordDetected()
@@ -417,16 +417,16 @@ class VoiceListenerService : Service() {
                     // Play request sent beep
                     BeepGenerator.playRequestSentBeep()
 
-                    // Send to callback
+                    // Send to callback if ChatScreen is active, otherwise send to server
                     if (onCommandRecognizedCallback != null) {
                         DebugLog.d(TAG, "Invoking callback with command: '$command'")
                         onCommandRecognizedCallback?.invoke(command)
+                        returnToWakeWordListening()
                     } else {
-                        DebugLog.e(TAG, "No callback set! Command will be lost: '$command'")
+                        DebugLog.d(TAG, "No callback set, sending to server directly: '$command'")
+                        updateNotification("Processing: $command")
+                        sendToServer(command)
                     }
-
-                    // Return to wake word listening
-                    returnToWakeWordListening()
                 } else {
                     returnToWakeWordListening()
                 }
