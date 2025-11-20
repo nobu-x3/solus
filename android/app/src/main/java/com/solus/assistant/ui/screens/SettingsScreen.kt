@@ -17,7 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.solus.assistant.data.network.RetrofitClient
 import com.solus.assistant.data.preferences.SettingsManager
-import com.solus.assistant.util.PiperTTSManager
+import com.solus.assistant.util.AndroidTTSManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -306,7 +306,7 @@ fun SettingsScreen(
                     onExpandedChange = { expandedVoiceDropdown = !expandedVoiceDropdown }
                 ) {
                     OutlinedTextField(
-                        value = PiperTTSManager.AVAILABLE_VOICES.find { it.id == ttsVoiceId }?.name ?: "Select voice",
+                        value = AndroidTTSManager.AVAILABLE_VOICES.find { it.id == ttsVoiceId }?.name ?: "Select voice",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Voice") },
@@ -320,7 +320,7 @@ fun SettingsScreen(
                         expanded = expandedVoiceDropdown,
                         onDismissRequest = { expandedVoiceDropdown = false }
                     ) {
-                        PiperTTSManager.AVAILABLE_VOICES.forEach { voice ->
+                        AndroidTTSManager.AVAILABLE_VOICES.forEach { voice ->
                             DropdownMenuItem(
                                 text = {
                                     Column {

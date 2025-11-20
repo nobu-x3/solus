@@ -18,7 +18,7 @@ import androidx.core.app.NotificationCompat
 import com.solus.assistant.MainActivity
 import com.solus.assistant.util.BeepGenerator
 import com.solus.assistant.util.DebugLog
-import com.solus.assistant.util.PiperTTSManager
+import com.solus.assistant.util.AndroidTTSManager
 import com.solus.assistant.util.VoskModelDownloader
 import com.solus.assistant.data.model.ChatMessage
 import com.solus.assistant.data.model.ChatRequest
@@ -47,7 +47,7 @@ class VoiceListenerService : Service() {
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var settingsManager: SettingsManager
     private lateinit var actionExecutor: ActionExecutor
-    private lateinit var ttsManager: PiperTTSManager
+    private lateinit var ttsManager: AndroidTTSManager
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var isListening = false
@@ -90,7 +90,7 @@ class VoiceListenerService : Service() {
 
         settingsManager = SettingsManager(this)
         actionExecutor = ActionExecutor(this)
-        ttsManager = PiperTTSManager(this)
+        ttsManager = AndroidTTSManager(this)
 
         createNotificationChannel()
         // Don't call startForeground() here - Android 14 requires user interaction first
