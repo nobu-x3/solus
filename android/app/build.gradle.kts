@@ -105,6 +105,9 @@ dependencies {
     // Vosk wake word detection (free, open source, on-device)
     implementation("com.alphacephei:vosk-android:0.3.47")
 
+    // Sherpa-ONNX for Piper TTS (free, open source, on-device)
+    implementation("com.bihe0832.android:lib-sherpa-onnx:6.25.12")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
