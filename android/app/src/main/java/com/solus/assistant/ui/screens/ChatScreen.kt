@@ -166,35 +166,6 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            if (isListening) {
-                                voiceService?.stopListening()
-                                isListening = false
-                            } else {
-                                val intent = Intent(context, VoiceListenerService::class.java).apply {
-                                    action = VoiceListenerService.ACTION_START_LISTENING
-                                }
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    context.startForegroundService(intent)
-                                } else {
-                                    context.startService(intent)
-                                }
-                                voiceService?.startListening()
-                                isListening = true
-                            }
-                        }
-                    ) {
-                        Icon(
-                            if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                            if (isListening) "Stop Listening" else "Start Listening",
-                            tint = if (isListening) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            }
-                        )
-                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, "Settings")
                     }
