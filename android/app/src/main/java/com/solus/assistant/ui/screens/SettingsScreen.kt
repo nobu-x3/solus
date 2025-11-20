@@ -36,6 +36,7 @@ fun SettingsScreen(
     var wakeWordEnabled by remember { mutableStateOf(true) }
     var wakeWord by remember { mutableStateOf("") }
     var connectionStatus by remember { mutableStateOf<ConnectionStatus>(ConnectionStatus.Idle) }
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     // Load settings
     LaunchedEffect(Unit) {
@@ -262,6 +263,26 @@ fun SettingsScreen(
 
             Divider()
 
+            // Chat History Section
+            Text(
+                text = "Chat History",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Button(
+                onClick = { showClearHistoryDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Clear Chat History")
+            }
+
+            Divider()
+
             // Save Button
             Button(
                 onClick = {
@@ -317,6 +338,35 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    // Clear History Confirmation Dialog
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            title = { Text("Clear Chat History?") },
+            text = { Text("This will permanently delete all chat messages. This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            settingsManager.clearChatHistory()
+                            showClearHistoryDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
