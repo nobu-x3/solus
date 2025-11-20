@@ -26,3 +26,5 @@ __pycache__/
 *.pyc
 .env
 memory_db/
+android/*gradle*
+android/local*
