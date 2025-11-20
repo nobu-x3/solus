@@ -264,7 +264,8 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(8.dp),
-                            horizontalArrangement = Arrangement.Start
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Card(
                                 colors = CardDefaults.cardColors(
@@ -285,6 +286,15 @@ fun ChatScreen(
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
+                            }
+                            TextButton(
+                                onClick = {
+                                    android.util.Log.d("ChatScreen", "Cancel button clicked")
+                                    isSending = false
+                                    voiceService?.cancelCurrentRequest()
+                                }
+                            ) {
+                                Text("Cancel")
                             }
                         }
                     }

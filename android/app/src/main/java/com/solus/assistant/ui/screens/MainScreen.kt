@@ -49,6 +49,7 @@ fun MainScreen(
     var isListening by remember { mutableStateOf(false) }
     var serviceConnected by remember { mutableStateOf(false) }
     var voiceService: VoiceListenerService? by remember { mutableStateOf(null) }
+    var isPendingResponse by remember { mutableStateOf(false) }
 
     // Service connection
     val serviceConnection = remember {
@@ -84,6 +85,12 @@ fun MainScreen(
         }
         launch {
             settingsManager.serverPort.collect { serverPort = it }
+        }
+        launch {
+            settingsManager.isPendingResponse.collect { isPending ->
+                android.util.Log.d("MainScreen", "isPendingResponse changed to: $isPending")
+                isPendingResponse = isPending
+            }
         }
     }
 
@@ -308,6 +315,38 @@ fun MainScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
+                    }
+
+                    // Show pending request status
+                    if (isPendingResponse) {
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Text(
+                                    "Processing request...",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    android.util.Log.d("MainScreen", "Cancel button clicked")
+                                    voiceService?.cancelCurrentRequest()
+                                }
+                            ) {
+                                Text("Cancel")
+                            }
+                        }
                     }
 
                     Button(

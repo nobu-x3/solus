@@ -55,6 +55,7 @@ class VoiceListenerService : Service() {
     private var modelId = SettingsManager.DEFAULT_MODEL_ID // Loaded from settings
 
     private var onCommandRecognizedCallback: ((String) -> Unit)? = null
+    private var currentRequestJob: Job? = null
 
     inner class LocalBinder : Binder() {
         fun getService(): VoiceListenerService = this@VoiceListenerService
@@ -62,6 +63,22 @@ class VoiceListenerService : Service() {
 
     fun setCommandRecognizedCallback(callback: (String) -> Unit) {
         onCommandRecognizedCallback = callback
+    }
+
+    /**
+     * Cancel the current ongoing request
+     */
+    fun cancelCurrentRequest() {
+        DebugLog.d(TAG, "Cancelling current request")
+        currentRequestJob?.cancel()
+        currentRequestJob = null
+
+        serviceScope.launch {
+            settingsManager.setPendingResponse(false)
+        }
+
+        updateNotification("Request cancelled")
+        returnToWakeWordListening()
     }
 
     override fun onCreate() {
@@ -514,7 +531,7 @@ class VoiceListenerService : Service() {
      * Send command to server
      */
     private fun sendToServer(text: String) {
-        serviceScope.launch {
+        currentRequestJob = serviceScope.launch {
             try {
                 // Save user message immediately
                 val userMessage = ChatMessage(text, isUser = true, isVoiceInput = true)
@@ -579,6 +596,8 @@ class VoiceListenerService : Service() {
                 updateNotification("Error: ${e.message}")
                 settingsManager.setPendingResponse(false)
                 returnToWakeWordListening()
+            } finally {
+                currentRequestJob = null
             }
         }
     }
