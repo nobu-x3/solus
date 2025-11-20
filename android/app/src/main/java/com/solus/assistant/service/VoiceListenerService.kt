@@ -112,12 +112,19 @@ class VoiceListenerService : Service() {
             launch {
                 settingsManager.ttsVoiceId.collect { voiceId ->
                     DebugLog.d(TAG, "TTS voice ID updated to: '$voiceId'")
-                    // Initialize TTS if voice is installed
-                    if (ttsManager.isVoiceInstalled(voiceId)) {
-                        ttsManager.initialize(voiceId)
+
+                    // Check if voice is installed, fallback to default if not
+                    val validVoiceId = if (ttsManager.isVoiceInstalled(voiceId)) {
+                        voiceId
                     } else {
-                        DebugLog.d(TAG, "TTS voice not installed: $voiceId")
+                        // Voice not found - use default and update preferences
+                        DebugLog.d(TAG, "TTS voice not installed: $voiceId, using default: ${SettingsManager.DEFAULT_TTS_VOICE_ID}")
+                        settingsManager.setTtsVoiceId(SettingsManager.DEFAULT_TTS_VOICE_ID)
+                        SettingsManager.DEFAULT_TTS_VOICE_ID
                     }
+
+                    // Initialize TTS with valid voice
+                    ttsManager.initialize(validVoiceId)
                 }
             }
         }
