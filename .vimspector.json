@@ -1,0 +1,16 @@
+{
+  "configurations": {
+    "Launch": {
+      "adapter": "vscode-cpptools",
+      "configuration": {
+        "request": "launch",
+        "program": "${workspaceFolder}/build/solus_server",
+        "args": [],
+        "cwd": "${workspaceFolder}",
+        "environment":[],
+        "externalConsole": true,
+        "MIMode": "gdb"
+      }
+    }
+  }
+}
