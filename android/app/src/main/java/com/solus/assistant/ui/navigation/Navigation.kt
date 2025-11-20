@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.solus.assistant.ui.screens.ChatScreen
 import com.solus.assistant.ui.screens.MainScreen
 import com.solus.assistant.ui.screens.SettingsScreen
 
@@ -12,6 +13,7 @@ import com.solus.assistant.ui.screens.SettingsScreen
  */
 object Routes {
     const val MAIN = "main"
+    const val CHAT = "chat"
     const val SETTINGS = "settings"
 }
 
@@ -28,6 +30,20 @@ fun Navigation() {
     ) {
         composable(Routes.MAIN) {
             MainScreen(
+                onNavigateToChat = {
+                    navController.navigate(Routes.CHAT)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Routes.SETTINGS)
+                }
+            )
+        }
+
+        composable(Routes.CHAT) {
+            ChatScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
                 onNavigateToSettings = {
                     navController.navigate(Routes.SETTINGS)
                 }
