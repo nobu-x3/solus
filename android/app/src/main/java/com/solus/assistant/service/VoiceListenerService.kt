@@ -72,7 +72,10 @@ class VoiceListenerService : Service() {
                 settingsManager.conversationId.collect { conversationId = it }
             }
             launch {
-                settingsManager.wakeWord.collect { wakeWord = it }
+                settingsManager.wakeWord.collect {
+                    wakeWord = it
+                    DebugLog.d(TAG, "Wake word updated to: '$wakeWord'")
+                }
             }
             launch {
                 settingsManager.voskModelId.collect { modelId = it }
@@ -222,13 +225,7 @@ class VoiceListenerService : Service() {
 
                 val listener = object : VoskRecognitionListener {
                     override fun onPartialResult(hypothesis: String?) {
-                        hypothesis?.let {
-                            val text = parseVoskJson(it)
-                            if (text != null) {
-                                DebugLog.d(TAG, "Partial: '$text'")
-                                checkForWakeWord(it)
-                            }
-                        }
+                        // Don't log or process partials - too spammy
                     }
 
                     override fun onResult(hypothesis: String?) {
@@ -427,13 +424,7 @@ class VoiceListenerService : Service() {
             // Restart Vosk listening
             voskService?.startListening(object : VoskRecognitionListener {
                 override fun onPartialResult(hypothesis: String?) {
-                    hypothesis?.let {
-                        val text = parseVoskJson(it)
-                        if (text != null) {
-                            DebugLog.d(TAG, "Partial: '$text'")
-                            checkForWakeWord(it)
-                        }
-                    }
+                    // Don't log or process partials - too spammy
                 }
 
                 override fun onResult(hypothesis: String?) {
