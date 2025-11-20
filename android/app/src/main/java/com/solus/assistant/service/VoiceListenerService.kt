@@ -321,7 +321,12 @@ class VoiceListenerService : Service() {
                 BeepGenerator.playRequestSentBeep()
 
                 // Send command to callback
-                onCommandRecognizedCallback?.invoke(commandText)
+                if (onCommandRecognizedCallback != null) {
+                    DebugLog.d(TAG, "Invoking callback with command: '$commandText'")
+                    onCommandRecognizedCallback?.invoke(commandText)
+                } else {
+                    DebugLog.e(TAG, "No callback set! Command will be lost: '$commandText'")
+                }
 
                 // Return to wake word listening after callback
                 returnToWakeWordListening()
@@ -413,7 +418,12 @@ class VoiceListenerService : Service() {
                     BeepGenerator.playRequestSentBeep()
 
                     // Send to callback
-                    onCommandRecognizedCallback?.invoke(command)
+                    if (onCommandRecognizedCallback != null) {
+                        DebugLog.d(TAG, "Invoking callback with command: '$command'")
+                        onCommandRecognizedCallback?.invoke(command)
+                    } else {
+                        DebugLog.e(TAG, "No callback set! Command will be lost: '$command'")
+                    }
 
                     // Return to wake word listening
                     returnToWakeWordListening()
