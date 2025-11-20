@@ -520,6 +520,9 @@ class VoiceListenerService : Service() {
                 val userMessage = ChatMessage(text, isUser = true, isVoiceInput = true)
                 settingsManager.addMessageToHistory(userMessage)
 
+                // Set pending state
+                settingsManager.setPendingResponse(true)
+
                 val baseUrl = settingsManager.serverBaseUrl.first()
                 val userId = settingsManager.userId.first()
                 val api = RetrofitClient.getInstance(baseUrl)
@@ -546,6 +549,9 @@ class VoiceListenerService : Service() {
                         val assistantMessage = ChatMessage(chatResponse.response, isUser = false, isVoiceInput = true)
                         settingsManager.addMessageToHistory(assistantMessage)
 
+                        // Clear pending state
+                        settingsManager.setPendingResponse(false)
+
                         // Execute action if present
                         chatResponse.action?.let { action ->
                             DebugLog.d(TAG, "Executing action: ${action.type}")
@@ -565,11 +571,13 @@ class VoiceListenerService : Service() {
                 } else {
                     DebugLog.e(TAG, "Server error: ${response.code()} ${response.message()}")
                     updateNotification("Server error: ${response.code()}")
+                    settingsManager.setPendingResponse(false)
                     returnToWakeWordListening()
                 }
             } catch (e: Exception) {
                 DebugLog.e(TAG, "Error sending to server", e)
                 updateNotification("Error: ${e.message}")
+                settingsManager.setPendingResponse(false)
                 returnToWakeWordListening()
             }
         }
